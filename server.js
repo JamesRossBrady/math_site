@@ -5,7 +5,11 @@ const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
 const crypto = require('crypto');
-const stripe = require('stripe')(process.env.STRIPE_API_KEY);
+// Stripe - only initialize if API key is provided
+let stripe = null;
+if (process.env.STRIPE_API_KEY) {
+    stripe = require('stripe')(process.env.STRIPE_API_KEY);
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -243,7 +247,7 @@ app.post('/api/signup', async (req, res) => {
 
         // Create Stripe customer with payment method
         let stripeCustomerId = null;
-        if (paymentMethodId) {
+        if (stripe && paymentMethodId) {
             try {
                 const customer = await stripe.customers.create({
                     email: email,
