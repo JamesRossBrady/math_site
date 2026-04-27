@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whiteboard - Learn Math with James</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f5f5f5; min-height: 100vh; display: flex; flex-direction: column; }
+        .toolbar { background: white; padding: 12px 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .toolbar h1 { font-size: 18px; color: #333; margin-right: auto; }
+        .tool-group { display: flex; gap: 8px; align-items: center; padding: 0 12px; border-left: 1px solid #ddd; }
+        .tool-group:first-of-type { border-left: none; }
+        .tool-btn { padding: 8px 15px; border: 1px solid #ddd; border-radius: 5px; background: white; cursor: pointer; font-size: 14px; }
+        .tool-btn:hover { background: #f5f5f5; }
+        .tool-btn.active { background: #4CAF50; color: white; border-color: #4CAF50; }
+        .color-picker { width: 35px; height: 35px; border: none; cursor: pointer; border-radius: 5px; }
+        .canvas-container { flex: 1; display: flex; justify-content: center; align-items: center; padding: 20px; background: #e0e0e0; }
+        canvas { background: white; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); cursor: crosshair; }
+        .back { color: #666; text-decoration: none; padding: 10px 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .back:hover { background: #f5f5f5; }
+        .time-info { display: flex; justify-content: space-between; width: 100%; padding: 10px 20px; background: #f0f0f0; border-bottom: 1px solid #ddd; }
+        .time-box { text-align: left; }
+        .time-box.right { text-align: right; }
+        .time-display { font-size: 24px; font-weight: bold; color: #333; }
+        .time-label { font-size: 12px; color: #666; }
+        .session-label { font-size: 14px; color: #666; margin-bottom: 2px; }
+    </style>
+</head>
+<body>
+    <div class="time-info">
+        <div class="time-box">
+            <div class="time-display" id="currentTime">--:--</div>
+            <div class="time-label">Mountain Standard Time</div>
+        </div>
+        <div class="time-box right">
+            <div class="session-label">Scheduled session:</div>
+            <div class="time-display" id="sessionTime">--:-- to --:--</div>
+            <div class="time-label">Mountain Standard Time</div>
+        </div>
+    </div>
+    <div class="toolbar">
+        <h1>Whiteboard</h1>
+        <div class="tool-group">
+            <button class="tool-btn active" id="btnPen" onclick="setTool('pen')">Pen</button>
+            <button class="tool-btn" id="btnEraser" onclick="setTool('eraser')">Eraser</button>
+            <button class="tool-btn" id="btnText" onclick="setTool('text')">Text</button>
+        </div>
+        <div class="tool-group">
+            <label>Size:</label>
+            <select id="sizeSlider" class="tool-btn" onchange="updateSize()">
+                <option value="3">3</option>
+                <option value="5">5</option>
+                <option value="8">8</option>
+                <option value="12">12</option>
+            </select>
+        </div>
+        <div class="tool-group">
+            <label>Text:</label>
+            <select id="textSize" class="tool-btn" onchange="updateSize()">
+                <option value="12">12</option>
+                <option value="16">16</option>
+                <option value="20">20</option>
+                <option value="24">24</option>
+            </select>
+        </div>
+        <div class="tool-group">
+            <label>Color:</label>
+            <input type="color" id="colorPicker" value="#000000" onchange="updateColor()">
+        </div>
+        <div class="tool-group">
+            <button class="tool-btn" onclick="clearCanvas()">Clear</button>
+            <button class="tool-btn" onclick="saveCanvas()">Save</button>
+        </div>
+        <a href="video.html" id="backLink" class="back">&larr; Back</a>
+    </div>
+    <div class="canvas-container">
+        <canvas id="canvas" width="1200" height="700"></canvas>
+        <input type="text" id="textInput" style="display:none; position:absolute; border:none; outline:none; font-size:16px; padding:4px; min-width:50px;" />
+    </div>
+    <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let tool = 'pen';
+        let color = '#000000';
+        let size = 3;
+        let textSize = 12;
+
+        // State for click-click line mode
+        let penAnchor = null;
+        let penCanvas = null;  // Stores clean canvas (without indicator)
+        let penSaved = null;
+
+        let prevX = 0, prevY = 0;
+        let isMouseDown = false;
+        let mouseMoved = false;
+        let lastMousePos = { x: 0, y: 0 };  // Track last mouse position for size indicator updates
+
+        const socket = io();
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionDate = urlParams.get('date');
+        const sessionHour = urlParams.get('hour');
+        document.getElementById('backLink').href = 'video.html?' + urlParams.toString();
+
+        // Display session time (50 minute sessions)
+        if (sessionDate && sessionHour) {
+            const startHour = parseInt(sessionHour);
+            const startMinute = 0;
+            const endMinute = 50;
+            const startAmpm = startHour >= 12 ? 'PM' : 'AM';
+            const endAmpm = startHour >= 12 ? 'PM' : 'AM';
+            const startDisplay = startHour > 12 ? startHour - 12 : (startHour === 0 ? 12 : startHour);
+            const timeStr = `${startDisplay}:${startMinute.toString().padStart(2, '0')} ${startAmpm} to ${startDisplay}:${endMinute} ${endAmpm}`;
+            document.getElementById('sessionTime').textContent = timeStr;
+        }
+
+        // Update current time every second (MST = UTC-7)
+        function updateCurrentTime() {
+            const now = new Date();
+            // Convert to MST (UTC-7)
+            const mstOffset = -7;
+            const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+            const mstTime = new Date(utc + (3600000 * mstOffset));
+            const hours = mstTime.getHours();
+            const minutes = mstTime.getMinutes();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const displayHour = hours > 12 ? hours - 12 : (hours === 0 ? 12 : hours);
+            const displayTime = `${displayHour}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+            document.getElementById('currentTime').textContent = displayTime;
+        }
+        updateCurrentTime();
+        setInterval(updateCurrentTime, 1000);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        socket.on('draw', d => drawLine(d));
+        socket.on('clear', () => { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); });
+        socket.on('text', t => { ctx.font = t.s + 'px Arial'; ctx.fillStyle = t.c; ctx.fillText(t.txt, t.x, t.y); });
+
+        function drawLine(d) {
+            ctx.beginPath();
+            ctx.moveTo(d.x1, d.y1);
+            ctx.lineTo(d.x2, d.y2);
+            ctx.strokeStyle = d.t === 'eraser' ? '#ffffff' : d.c;
+            ctx.lineWidth = d.t === 'eraser' ? d.s * 3 : d.s;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
+
+        function drawPreview(x1, y1, x2, y2) {
+            if (penSaved) {
+                ctx.putImageData(penSaved, 0, 0);
+            }
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function snap(x1, y1, x2, y2, evt) {
+            if (!evt || !evt.ctrlKey) return { x: x2, y: y2 };
+            const a = Math.atan2(y2 - y1, x2 - x1), len = Math.hypot(x2 - x1, y2 - y1);
+            const s = Math.round(a / (Math.PI / 12)) * (Math.PI / 12);
+            return { x: x1 + len * Math.cos(s), y: y1 + len * Math.sin(s) };
+        }
+
+        // ===== TOOL SWITCHING =====
+
+        function setTool(t) {
+            // Just clear state variables, don't restore any canvas
+            if (tool === 'pen' && penCanvas) {
+                ctx.putImageData(penCanvas, 0, 0);
+                penCanvas = null;
+            }
+            if (tool === 'eraser') {
+                if (eraserCanvas) {
+                    ctx.putImageData(eraserCanvas, 0, 0);
+                    eraserCanvas = null;
+                }
+                eraserActive = false;
+            }
+
+            tool = t;
+            penAnchor = null;
+            penSaved = null;
+
+            // Update UI
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn' + (t==='pen'?'Pen':t==='eraser'?'Eraser':'Text')).classList.add('active');
+
+            // Initialize pen tool
+            if (t === 'pen') {
+                penCanvas = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            }
+
+            // Activate eraser immediately when switching to eraser
+            if (t === 'eraser') {
+                eraserActive = true;
+                eraserCanvas = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            }
+
+            // Update size indicator immediately if mouse is over canvas
+            if ((t === 'pen' || t === 'eraser') && lastMousePos.x > 0) {
+                updateSizeIndicator();
+            }
+        }
+
+        function updateColor() { color = document.getElementById('colorPicker').value; }
+        function updateSize() {
+            size = parseInt(document.getElementById('sizeSlider').value);
+            textSize = parseInt(document.getElementById('textSize').value);
+            updateSizeIndicator();
+        }
+
+        // Update size indicator when size changes
+        function updateSizeIndicator() {
+            if (tool === 'pen' && lastMousePos.x > 0) {
+                // Just draw indicator at current position
+                ctx.beginPath();
+                ctx.arc(lastMousePos.x, lastMousePos.y, size / 2, 0, Math.PI * 2);
+                ctx.setLineDash([5, 5]);
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+            if (tool === 'eraser' && lastMousePos.x > 0) {
+                // Just draw indicator at current position - will be cleared on next eraseMove
+                ctx.beginPath();
+                ctx.arc(lastMousePos.x, lastMousePos.y, size * 3, 0, Math.PI * 2);
+                ctx.setLineDash([5, 5]);
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+        function clearCanvas() { if (confirm('Clear?')) { socket.emit('clear'); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); penAnchor = null; penSaved = null; } }
+        function saveCanvas() { const l = document.createElement('a'); l.download = 'whiteboard.png'; l.href = canvas.toDataURL(); l.click(); }
+        function getPos(e) { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * (canvas.width/r.width), y: (e.clientY - r.top) * (canvas.height/r.height) }; }
+
+        // Hotkeys
+        document.addEventListener('keydown', function(e) {
+            if (e.target.tagName === 'INPUT') return;  // Don't trigger while typing in input
+
+            if (e.key === 'p') setTool('pen');
+            if (e.key === 'e') setTool('eraser');
+            if (e.key === 't') setTool('text');
+
+            // Size adjustment with arrow keys
+            if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                // Increase size
+                if (tool === 'pen' || tool === 'eraser') {
+                    size = Math.min(20, size + 1);
+                    // Update the selector
+                    let select = document.getElementById('sizeSlider');
+                    if (!select.querySelector('option[value="' + size + '"]')) {
+                        // Add option if it doesn't exist
+                        let opt = document.createElement('option');
+                        opt.value = size;
+                        opt.text = size;
+                        select.add(opt);
+                    }
+                    select.value = size;
+                }
+                if (tool === 'text') {
+                    textSize = Math.min(48, textSize + 2);
+                    let select = document.getElementById('textSize');
+                    if (!select.querySelector('option[value="' + textSize + '"]')) {
+                        let opt = document.createElement('option');
+                        opt.value = textSize;
+                        opt.text = textSize;
+                        select.add(opt);
+                    }
+                    select.value = textSize;
+                }
+                updateSizeIndicator();
+            }
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                // Decrease size
+                if (tool === 'pen' || tool === 'eraser') {
+                    size = Math.max(1, size - 1);
+                    let select = document.getElementById('sizeSlider');
+                    if (!select.querySelector('option[value="' + size + '"]')) {
+                        let opt = document.createElement('option');
+                        opt.value = size;
+                        opt.text = size;
+                        select.add(opt);
+                    }
+                    select.value = size;
+                }
+                if (tool === 'text') {
+                    textSize = Math.max(8, textSize - 2);
+                    let select = document.getElementById('textSize');
+                    if (!select.querySelector('option[value="' + textSize + '"]')) {
+                        let opt = document.createElement('option');
+                        opt.value = textSize;
+                        opt.text = textSize;
+                        select.add(opt);
+                    }
+                    select.value = textSize;
+                }
+                updateSizeIndicator();
+            }
+        });
+
+        let clickStartPos = null;
+        let isAnchorSet = false;  // true after first click-release
+
+        canvas.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            const pos = getPos(e);
+            prevX = pos.x; prevY = pos.y;
+            isMouseDown = true;
+            mouseMoved = false;
+            clickStartPos = { x: pos.x, y: pos.y };
+
+            if (tool === 'pen') {
+                // Save canvas state on mousedown (before any drawing)
+                penCanvas = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+                if (!isAnchorSet) {
+                    // First click - set anchor
+                    penAnchor = { x: pos.x, y: pos.y };
+                    penSaved = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                }
+                // If anchor already set, this is the second click
+            }
+        });
+
+        canvas.addEventListener('mousemove', function(e) {
+            const pos = getPos(e);
+            lastMousePos = { x: pos.x, y: pos.y };
+
+            // Check if mouse moved significantly from click start
+            if (clickStartPos && (Math.abs(pos.x - clickStartPos.x) > 5 || Math.abs(pos.y - clickStartPos.y) > 5)) {
+                mouseMoved = true;
+            }
+
+            if (tool === 'pen') {
+                if (isMouseDown && mouseMoved && penAnchor && !isAnchorSet) {
+                    // Click+hold+drag - start free draw
+                    isAnchorSet = false;
+                    penAnchor = null;
+                    penSaved = null;
+                }
+
+                if (isMouseDown && mouseMoved && !penAnchor) {
+                    // Free draw mode - just draw
+                    drawLine({ x1: prevX, y1: prevY, x2: pos.x, y2: pos.y, t: tool, c: color, s: size });
+                    socket.emit('draw', { x1: prevX, y1: prevY, x2: pos.x, y2: pos.y, t: tool, c: color, s: size });
+                    prevX = pos.x;
+                    prevY = pos.y;
+                    // Save canvas after drawing
+                    penCanvas = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                } else if (isAnchorSet && penAnchor && penSaved) {
+                    // Anchor is set, show preview line
+                    ctx.putImageData(penSaved, 0, 0);
+                    const end = snap(penAnchor.x, penAnchor.y, pos.x, pos.y, e);
+                    drawPreview(penAnchor.x, penAnchor.y, end.x, end.y);
+                }
+                // Don't draw indicator in mousemove - too complicated, causes issues
+            }
+
+            prevX = pos.x;
+            prevY = pos.y;
+        });
+
+        canvas.addEventListener('mouseup', function(e) {
+            const pos = getPos(e);
+
+            if (tool === 'pen') {
+                if (!isAnchorSet && !mouseMoved) {
+                    // First click released - set anchor, show preview
+                    isAnchorSet = true;
+                    // Keep penAnchor and penSaved for preview
+                } else if (isAnchorSet && penAnchor) {
+                    // Second click - draw the line
+                    const end = snap(penAnchor.x, penAnchor.y, pos.x, pos.y, e);
+                    drawLine({ x1: penAnchor.x, y1: penAnchor.y, x2: end.x, y2: end.y, t: tool, c: color, s: size });
+                    socket.emit('draw', { x1: penAnchor.x, y1: penAnchor.y, x2: end.x, y2: end.y, t: tool, c: color, s: size });
+                    // Save canvas so next mousemove doesn't wipe it
+                    penCanvas = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    // Reset
+                    isAnchorSet = false;
+                    penAnchor = null;
+                    penSaved = null;
+                }
+            }
+
+            clickStartPos = null;
+            isMouseDown = false;
+            mouseMoved = false;
+        });
+
+        // When mouse leaves canvas, reset anchor and clear indicator
+        canvas.addEventListener('mouseleave', function() {
+            if (tool === 'pen') {
+                if (isAnchorSet) {
+                    isAnchorSet = false;
+                    penAnchor = null;
+                    penSaved = null;
+                }
+                if (penCanvas) {
+                    ctx.putImageData(penCanvas, 0, 0);
+                    penCanvas = null;
+                }
+            }
+        });
+
+        // ===== ERASER TOOL =====
+        let eraserCanvas = null;  // Stores clean canvas (without indicator) for restoring
+        let eraserMouseDown = false;
+        let eraserActive = false;  // Only true after mouse enters canvas with eraser tool
+
+        function eraseMove(e) {
+            if (tool !== 'eraser' || !eraserActive) return;
+            const pos = getPos(e);
+            lastMousePos = { x: pos.x, y: pos.y };
+
+            // Restore clean canvas to clear previous indicator from last frame
+            if (eraserCanvas) {
+                ctx.putImageData(eraserCanvas, 0, 0);
+            }
+
+            // Erase if mouse is down
+            if (eraserMouseDown) {
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, size * 3, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+                socket.emit('draw', {
+                    x1: pos.x - size * 3, y1: pos.y,
+                    x2: pos.x + size * 3, y2: pos.y,
+                    t: 'eraser', c: '#ffffff', s: size * 3
+                });
+            }
+
+            // Save canvas AFTER erasing (so next frame restores correctly)
+            eraserCanvas = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+            // Draw indicator on top (NOT saved - just visual, will be cleared next frame)
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, size * 3, 0, Math.PI * 2);
+            ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Only enable tools after mouse enters canvas
+        canvas.addEventListener('mouseenter', function() {
+            if (tool === 'eraser') {
+                eraserActive = true;
+                eraserCanvas = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            }
+            if (tool === 'pen') {
+                penCanvas = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                // Draw indicator
+                if (lastMousePos.x > 0) {
+                    ctx.beginPath();
+                    ctx.arc(lastMousePos.x, lastMousePos.y, size / 2, 0, Math.PI * 2);
+                    ctx.setLineDash([5, 5]);
+                    ctx.strokeStyle = 'red';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+        });
+
+        canvas.addEventListener('mouseleave', function() {
+            if (tool === 'eraser') {
+                if (eraserCanvas) {
+                    ctx.putImageData(eraserCanvas, 0, 0);
+                    eraserCanvas = null;
+                }
+                eraserActive = false;
+                eraserMouseDown = false;
+            }
+        });
+
+        canvas.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            if (tool === 'eraser' && eraserActive) {
+                eraserMouseDown = true;
+            }
+        });
+
+        canvas.addEventListener('mouseup', function(e) {
+            if (tool === 'eraser') {
+                eraserMouseDown = false;
+            }
+        });
+
+        canvas.addEventListener('mousemove', eraseMove);
+
+        // ===== TEXT TOOL =====
+        let textInputEl = document.getElementById('textInput');
+        let cursorPos = null;
+        let cursorBlink = true;
+        let cursorTimer = null;
+        let savedCanvas = null;
+
+        canvas.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            if (tool === 'text') {
+                const pos = getPos(e);
+                cursorPos = { x: pos.x, y: pos.y };
+                savedCanvas = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                showCursorInput(pos.x, pos.y);
+            }
+        });
+
+        function showCursorInput(x, y) {
+            const canvasRect = canvas.getBoundingClientRect();
+            const scale = canvasRect.width / canvas.width;
+
+            cursorPos = { drawX: x, drawY: y };
+
+            textInputEl.style.display = 'block';
+            textInputEl.style.left = (canvasRect.left + x * scale) + 'px';
+            textInputEl.style.top = (canvasRect.top + y * scale) + 'px';
+            textInputEl.style.fontSize = (textSize * scale) + 'px';
+            textInputEl.style.fontFamily = 'Arial';
+            textInputEl.value = '';
+            textInputEl.focus();
+
+            // NO canvas drawing at all - input field shows text, cursor is just HTML
+            textInputEl.onkeydown = function(e) {
+                if (e.key === 'Enter') finishText();
+            };
+            textInputEl.onblur = function() { finishText(); };
+        }
+
+        function finishText() {
+            const txt = textInputEl.value;
+            if (txt && cursorPos) {
+                ctx.font = textSize + 'px Arial';
+                ctx.fillStyle = color;
+                ctx.fillText(txt, cursorPos.drawX, cursorPos.drawY);
+                socket.emit('text', { txt, x: cursorPos.drawX, y: cursorPos.drawY, c: color, s: textSize });
+            }
+            textInputEl.style.display = 'none';
+            textInputEl.value = '';
+            textInputEl.onkeydown = null;
+            textInputEl.onblur = null;
+            cursorPos = null;
+        }
+
+        canvas.addEventListener('mouseleave', function() {
+            if (tool === 'text' && cursorPos) {
+                finishText();
+            }
+        });
+
+        updateSize();
+    </script>
+</body>
+</html>
