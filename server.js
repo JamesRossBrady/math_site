@@ -44,6 +44,10 @@ const pool = new Pool({
 
 // Initialize database tables
 async function initDB() {
+    if (!pool) {
+        console.log('No database configured, skipping DB init');
+        return;
+    }
     const client = await pool.connect();
     try {
         // Create users table
