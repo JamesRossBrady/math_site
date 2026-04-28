@@ -195,6 +195,14 @@
         </div>
 
         <div class="section">
+            <h2>Free Sessions</h2>
+            <div class="info-row">
+                <span class="info-label">Available Free Sessions</span>
+                <span class="info-value" id="freeSessions">Loading...</span>
+            </div>
+        </div>
+
+        <div class="section">
             <h2>Payment Method</h2>
             <div id="paymentMessage"></div>
 
@@ -251,6 +259,8 @@
                     statusEl.classList.remove('inactive');
                     statusEl.classList.add('active');
                 }
+
+                document.getElementById('freeSessions').textContent = data.free_sessions || 0;
             } catch (err) {
                 console.error('Error checking payment status:', err);
             }

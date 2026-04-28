@@ -519,7 +519,8 @@
             selectedDate = date;
 
             if (status === 'available') {
-                openModal();
+                // Check if user has payment method or free sessions before allowing booking
+                checkBookingEligibility();
             } else if (status === 'unavailable' || status === 'past') {
                 alert('This time slot is unavailable.');
             } else if (status === 'pending') {
@@ -528,6 +529,25 @@
                 const date = slot.dataset.date;
                 const hour = slot.dataset.hour;
                 window.location.href = 'video.html?date=' + date + '&hour=' + hour;
+            }
+        }
+
+        async function checkBookingEligibility() {
+            const user = JSON.parse(sessionStorage.getItem('user'));
+            try {
+                const response = await fetch('/api/user/' + user.id);
+                const data = await response.json();
+
+                if (!data.stripe_customer_id && (!data.free_sessions || data.free_sessions <= 0)) {
+                    alert('Please add a payment method or use a free session before booking.\nRedirecting to settings...');
+                    window.location.href = 'settings.html';
+                    return;
+                }
+
+                // Show booking modal
+                openModal();
+            } catch (err) {
+                alert('Error checking account. Please try again.');
             }
         }
 

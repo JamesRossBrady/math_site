@@ -411,7 +411,7 @@ app.get('/api/user/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
-            'SELECT id, username, email, stripe_customer_id, created_at FROM users WHERE id = $1',
+            'SELECT id, username, email, stripe_customer_id, free_sessions, created_at FROM users WHERE id = $1',
             [id]
         );
         if (result.rows.length === 0) {
@@ -480,7 +480,7 @@ app.post('/api/tutor/login', (req, res) => {
 // User signup
 app.post('/api/signup', async (req, res) => {
     try {
-        const { username, email, password, paymentMethodId } = req.body;
+        const { username, email, password } = req.body;
 
         // Check if username or email already exists
         const existing = await pool.query(
@@ -492,29 +492,11 @@ app.post('/api/signup', async (req, res) => {
             return res.status(400).json({ error: 'Username or email already exists' });
         }
 
-        // Create Stripe customer with payment method
-        let stripeCustomerId = null;
-        if (stripe && paymentMethodId) {
-            try {
-                const customer = await stripe.customers.create({
-                    email: email,
-                    payment_method: paymentMethodId,
-                    invoice_settings: {
-                        default_payment_method: paymentMethodId
-                    }
-                });
-                stripeCustomerId = customer.id;
-            } catch (stripeErr) {
-                console.error('Stripe error:', stripeErr);
-                return res.status(400).json({ error: 'Payment processing failed. Please check your card.' });
-            }
-        }
-
-        // Hash password and insert
+        // Hash password and insert (no payment method required at signup)
         const hash = crypto.createHash('sha256').update(password).digest('hex');
         const result = await pool.query(
-            'INSERT INTO users (username, email, password_hash, stripe_customer_id) VALUES ($1, $2, $3, $4) RETURNING id, username, email',
-            [username, email, hash, stripeCustomerId]
+            'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id, username, email',
+            [username, email, hash]
         );
 
         res.json({ success: true, user: result.rows[0] });

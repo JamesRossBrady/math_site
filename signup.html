@@ -108,20 +108,7 @@
         .back-link a:hover {
             text-decoration: underline;
         }
-
-        .payment-note {
-            text-align: center;
-            font-size: 12px;
-            color: #888;
-            margin-bottom: 15px;
-        }
-
-        .payment-note img {
-            height: 20px;
-            vertical-align: middle;
-        }
     </style>
-    <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
     <div class="container">
@@ -147,13 +134,6 @@
                 <input type="password" id="password" name="password" required>
             </div>
 
-            <div class="form-group">
-                <label>Payment Information</label>
-                <div id="card-element" style="padding: 12px; border: 1px solid #ddd; border-radius: 5px; background: white;"></div>
-            </div>
-
-            <p class="payment-note">Payments securely processed by Stripe</p>
-
             <p class="error" id="error" style="color: #f44336; text-align: center; margin-bottom: 15px; display: none;"></p>
 
             <button type="submit" class="btn btn-signup" id="submitBtn">Sign Up</button>
@@ -163,20 +143,6 @@
     </div>
 
     <script>
-        // Initialize Stripe (replace with your actual publishable key)
-        const stripe = Stripe('pk_test_51TQsYzANlBqrmq5SJzkQ6FfHX9ynz5dT38mZs5rF4ijtDywITjJMBgu2kZ8CkKdzO0rAC0M6M17q1B7zzD2DOkc500mT31PFWB');
-        const elements = stripe.elements();
-        const card = elements.create('card', {
-            style: {
-                base: {
-                    fontSize: '16px',
-                    color: '#333',
-                    '::placeholder': { color: '#999' }
-                }
-            }
-        });
-        card.mount('#card-element');
-
         document.getElementById('signupForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const username = document.getElementById('username').value;
@@ -189,30 +155,13 @@
             submitBtn.textContent = 'Processing...';
 
             try {
-                // Create payment method from card
-                const { paymentMethod, error: stripeError } = await stripe.createPaymentMethod({
-                    type: 'card',
-                    card: card,
-                    billing_details: { email: email }
-                });
-
-                if (stripeError) {
-                    errorEl.textContent = stripeError.message;
-                    errorEl.style.display = 'block';
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Sign Up';
-                    return;
-                }
-
-                // Send to server
                 const response = await fetch('/api/signup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         username,
                         email,
-                        password,
-                        paymentMethodId: paymentMethod.id
+                        password
                     })
                 });
 
