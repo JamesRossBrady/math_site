@@ -222,6 +222,54 @@ app.post('/api/sessions/reject', async (req, res) => {
     }
 });
 
+// Mark a session as unavailable (tutor has plans)
+app.post('/api/sessions/unavailable', async (req, res) => {
+    try {
+        const { slot_date, slot_hour } = req.body;
+
+        const result = await pool.query(
+            `UPDATE sessions
+             SET status = 'unavailable', updated_at = CURRENT_TIMESTAMP
+             WHERE slot_date = $1 AND slot_hour = $2 AND status = 'available'
+             RETURNING id, slot_date, slot_hour, status`,
+            [slot_date, slot_hour]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(400).json({ error: 'Slot not available to mark unavailable' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
+// Mark a session as available again
+app.post('/api/sessions/available', async (req, res) => {
+    try {
+        const { slot_date, slot_hour } = req.body;
+
+        const result = await pool.query(
+            `UPDATE sessions
+             SET status = 'available', updated_at = CURRENT_TIMESTAMP
+             WHERE slot_date = $1 AND slot_hour = $2 AND status = 'unavailable'
+             RETURNING id, slot_date, slot_hour, status`,
+            [slot_date, slot_hour]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(400).json({ error: 'Slot not found or not unavailable' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
 // Get session details
 app.get('/api/sessions/details', async (req, res) => {
     try {

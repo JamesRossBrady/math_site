@@ -143,6 +143,11 @@
             color: #2e7d32;
         }
 
+        .time-slot.unavailable {
+            background-color: #e0e0e0;
+            color: #9e9e9e;
+        }
+
         .legend {
             display: flex;
             gap: 20px;
@@ -175,6 +180,10 @@
 
         .legend-box.confirmed {
             background-color: #c8e6c9;
+        }
+
+        .legend-box.unavailable {
+            background-color: #e0e0e0;
         }
 
         .info {
@@ -290,6 +299,10 @@
                 <span>Available</span>
             </div>
             <div class="legend-item">
+                <div class="legend-box unavailable"></div>
+                <span>Unavailable</span>
+            </div>
+            <div class="legend-item">
                 <div class="legend-box pending"></div>
                 <span>Pending</span>
             </div>
@@ -301,6 +314,7 @@
 
         <div class="info">
             <p>All times listed in Mountain Standard Time (MST).</p>
+            <p>Click on an available (white) slot to mark it unavailable. Click unavailable to make available again.</p>
             <p>Click on a pending (yellow) slot to view details and confirm or reject the session.</p>
         </div>
     </div>
@@ -425,6 +439,9 @@
                     } else if (session && session.status === 'pending') {
                         slot.className = 'time-slot pending';
                         slot.textContent = 'Pending';
+                    } else if (session && session.status === 'unavailable') {
+                        slot.className = 'time-slot unavailable';
+                        slot.textContent = 'Unavailable';
                     } else {
                         slot.className = 'time-slot available';
                         slot.textContent = '50 min';
@@ -446,6 +463,18 @@
 
         function clickSlot(slot) {
             const status = slot.dataset.status;
+
+            // Toggle available/unavailable
+            if (status === 'available') {
+                toggleSlotStatus(slot, 'unavailable');
+                return;
+            }
+            if (status === 'unavailable') {
+                toggleSlotStatus(slot, 'available');
+                return;
+            }
+
+            // Show details for pending/confirmed
             if (status === 'pending' || status === 'confirmed') {
                 selectedSlot = slot;
                 selectedSlotData = {
@@ -528,6 +557,35 @@
                 }
             } catch (err) {
                 alert('Error rejecting session');
+            }
+        }
+
+        async function toggleSlotStatus(slot, newStatus) {
+            const endpoint = newStatus === 'unavailable' ? '/api/sessions/unavailable' : '/api/sessions/available';
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        slot_date: slot.dataset.date,
+                        slot_hour: parseInt(slot.dataset.hour)
+                    })
+                });
+                if (response.ok) {
+                    if (newStatus === 'unavailable') {
+                        slot.classList.remove('available');
+                        slot.classList.add('unavailable');
+                        slot.textContent = 'Unavailable';
+                        slot.dataset.status = 'unavailable';
+                    } else {
+                        slot.classList.remove('unavailable');
+                        slot.classList.add('available');
+                        slot.textContent = '50 min';
+                        slot.dataset.status = 'available';
+                    }
+                }
+            } catch (err) {
+                alert('Error updating slot');
             }
         }
 
