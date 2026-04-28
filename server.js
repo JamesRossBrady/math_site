@@ -191,7 +191,7 @@ app.post('/api/sessions/book', async (req, res) => {
              SET status = 'pending', student_id = $7, subject = $3, textbook = $4, chapter = $5, struggling = $6, updated_at = CURRENT_TIMESTAMP
              WHERE slot_date = $1 AND slot_hour = $2 AND status = 'available'
              RETURNING id, slot_date, slot_hour, status`,
-            [slot_date, slot_hour, subject, textbook, chapter, struggling, userId]
+            [slot_date, slot_hour, subject, textbook, struggling, userId]
         );
 
         if (result.rows.length === 0) {
