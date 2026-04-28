@@ -314,7 +314,7 @@
             </div>
             <div class="legend-item">
                 <div class="legend-box unavailable"></div>
-                <span>Unavailable</span>
+                <span>Unavailable/Past</span>
             </div>
             <div class="legend-item">
                 <div class="legend-box pending"></div>
@@ -461,7 +461,18 @@
 
                     const session = sessions.find(s => s.slot_date === slotDateStr && s.slot_hour === hour);
 
-                    if (session) {
+                    // Check if slot is in the past (MST = UTC-7)
+                    const now = new Date();
+                    const mstOffset = -7 * 60 * 60 * 1000; // UTC-7
+                    const mstNow = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + mstOffset);
+                    const slotDateTime = new Date(slotDateStr + 'T' + hour + ':00:00');
+                    const isPast = slotDateTime < mstNow;
+
+                    if (isPast) {
+                        slot.className = 'time-slot unavailable';
+                        slot.textContent = 'Past';
+                        slot.dataset.status = 'past';
+                    } else if (session) {
                         if (session.status === 'confirmed') {
                             slot.className = 'time-slot confirmed';
                             slot.textContent = 'Confirmed';
@@ -506,7 +517,7 @@
 
             if (status === 'available') {
                 openModal();
-            } else if (status === 'unavailable') {
+            } else if (status === 'unavailable' || status === 'past') {
                 alert('This time slot is unavailable.');
             } else if (status === 'pending') {
                 alert('This session is pending confirmation.');
