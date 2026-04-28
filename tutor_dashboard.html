@@ -498,6 +498,8 @@
         let selectedSlot = null;
         let selectedSlotData = null;
         let currentWeekOffset = 0;
+        const CONFIRM_TIMEOUT = 3000;
+        const REJECT_TIMEOUT = 2000;
 
         async function fetchSessions(startDate, endDate) {
             const startStr = startDate.toISOString().split('T')[0];
@@ -673,7 +675,7 @@
                     }
                     banner.textContent = 'Session accepted!';
                     banner.className = 'modal-banner success';
-                    setTimeout(() => closeModal(), 2000);
+                    setTimeout(() => closeModal(), CONFIRM_TIMEOUT);
                 } else {
                     banner.textContent = data.error || 'Error accepting session';
                     banner.className = 'modal-banner error';
@@ -709,7 +711,7 @@
                     }
                     banner.textContent = 'Session rejected';
                     banner.className = 'modal-banner error';
-                    setTimeout(() => closeModal(), 2000);
+                    setTimeout(() => closeModal(), REJECT_TIMEOUT);
                 } else {
                     banner.textContent = data.error || 'Error rejecting session';
                     banner.className = 'modal-banner error';
