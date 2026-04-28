@@ -24,6 +24,16 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '.')));
 
+// Debug endpoint - delete this after testing
+app.get('/api/debug', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT NOW() as time');
+        res.json({ time: result.rows[0].time, db: 'working' });
+    } catch (err) {
+        res.json({ db: 'error', error: err.message });
+    }
+});
+
 // Hardcoded tutor password (stored hashed with salt on server)
 const TUTOR_SALT = 'math_site_salt_2024';
 const TUTOR_PASSWORD_HASH = '703e110ea4de4bba15675565beb04f172abc91d2a885b38257dec10cfe5f8d33'; // SHA-256(salt + 'aladan64SOFT12v?')
