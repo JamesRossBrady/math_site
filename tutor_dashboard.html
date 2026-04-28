@@ -638,10 +638,12 @@
                 if (status === 'confirmed') {
                     document.getElementById('btnConfirm').style.display = 'none';
                     document.getElementById('btnReject').textContent = 'Close';
+                    document.getElementById('btnReject').onclick = function() { closeModal(); };
                     document.getElementById('btnStart').style.display = 'block';
                 } else {
                     document.getElementById('btnConfirm').style.display = 'block';
                     document.getElementById('btnReject').textContent = 'Reject';
+                    document.getElementById('btnReject').onclick = function() { rejectRequest(); };
                     document.getElementById('btnStart').style.display = 'none';
                 }
 
