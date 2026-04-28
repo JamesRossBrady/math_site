@@ -341,6 +341,27 @@
             font-size: 14px;
         }
 
+        .modal-banner {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-weight: bold;
+            display: none;
+        }
+
+        .modal-banner.success {
+            background-color: #4CAF50;
+            color: white;
+            display: block;
+        }
+
+        .modal-banner.error {
+            background-color: #f44336;
+            color: white;
+            display: block;
+        }
+
         .modal-buttons {
             display: flex;
             gap: 10px;
@@ -433,6 +454,7 @@
     <div class="modal" id="requestModal">
         <div class="modal-content">
             <h3>Session Request</h3>
+            <div class="modal-banner" id="modalBanner"></div>
             <div class="detail-group">
                 <label>Student</label>
                 <p id="detail-student">Student</p>
@@ -629,6 +651,7 @@
 
         async function confirmRequest() {
             if (!selectedSlotData) return;
+            const banner = document.getElementById('modalBanner');
             try {
                 const response = await fetch('/api/sessions/confirm', {
                     method: 'POST',
@@ -646,12 +669,16 @@
                         selectedSlot.textContent = 'Confirmed';
                         selectedSlot.dataset.status = 'confirmed';
                     }
-                    closeModal();
+                    banner.textContent = 'Session accepted!';
+                    banner.className = 'modal-banner success';
+                    setTimeout(() => closeModal(), 2000);
                 } else {
-                    alert(data.error || 'Error confirming session');
+                    banner.textContent = data.error || 'Error accepting session';
+                    banner.className = 'modal-banner error';
                 }
             } catch (err) {
-                alert('Error confirming session');
+                banner.textContent = 'Error accepting session';
+                banner.className = 'modal-banner error';
             }
         }
 
@@ -660,6 +687,7 @@
                 closeModal();
                 return;
             }
+            const banner = document.getElementById('modalBanner');
             try {
                 const response = await fetch('/api/sessions/reject', {
                     method: 'POST',
@@ -677,12 +705,17 @@
                         selectedSlot.textContent = '50 min';
                         selectedSlot.dataset.status = 'available';
                     }
-                    closeModal();
+                    banner.textContent = 'Session rejected';
+                    banner.className = 'modal-banner error';
+                    setTimeout(() => closeModal(), 2000);
                 } else {
-                    alert(data.error || 'Error rejecting session');
+                    banner.textContent = data.error || 'Error rejecting session';
+                    banner.className = 'modal-banner error';
                 }
             } catch (err) {
-                alert('Error rejecting session');
+                banner.textContent = 'Error rejecting session';
+                banner.className = 'modal-banner error';
+            }
             }
         }
 
@@ -717,6 +750,11 @@
 
         function closeModal() {
             document.getElementById('requestModal').classList.remove('active');
+            const banner = document.getElementById('modalBanner');
+            if (banner) {
+                banner.className = 'modal-banner';
+                banner.textContent = '';
+            }
             selectedSlot = null;
             selectedSlotData = null;
         }
