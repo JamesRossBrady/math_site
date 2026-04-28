@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Settings - Learn Math with James</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #333;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 15px;
+        }
+
+        .nav-links a {
+            color: #666;
+            text-decoration: none;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .nav-links a:hover {
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .section h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .info-label {
+            color: #666;
+        }
+
+        .info-value {
+            color: #333;
+            font-weight: bold;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        #card-element {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: white;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #45a049;
+        }
+
+        .btn-primary:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .message.success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .message.error {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+
+        .payment-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .status-badge.active {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .status-badge.inactive {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+    </style>
+    <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body>
+    <div class="header">
+        <h1>Account Settings</h1>
+        <div class="nav-links">
+            <a href="dashboard.html">Calendar</a>
+            <a href="#" onclick="logout()">Log Out</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="section">
+            <h2>Account Information</h2>
+            <div class="info-row">
+                <span class="info-label">Username</span>
+                <span class="info-value" id="username"></span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Email</span>
+                <span class="info-value" id="email"></span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Joined</span>
+                <span class="info-value" id="createdAt"></span>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Payment Method</h2>
+            <div id="paymentMessage"></div>
+
+            <div class="payment-status">
+                <span>Stripe Payment Method:</span>
+                <span class="status-badge inactive" id="paymentStatus">Not Added</span>
+            </div>
+
+            <br>
+
+            <div class="form-group">
+                <label>Add or Update Card</label>
+                <div id="card-element"></div>
+            </div>
+
+            <button class="btn btn-primary" id="saveCardBtn" onclick="savePaymentMethod()">Save Card</button>
+        </div>
+    </div>
+
+    <script>
+        const user = JSON.parse(sessionStorage.getItem('user'));
+        if (!user) {
+            window.location.href = 'signin.html';
+        }
+
+        document.getElementById('username').textContent = user.username;
+        document.getElementById('email').textContent = user.email;
+
+        // Check payment status
+        checkPaymentStatus();
+
+        // Initialize Stripe
+        const stripe = Stripe('pk_test_51TQsYzANlBqrmq5SJzkQ6FfHX9ynz5dT38mZs5rF4ijtDywITjJMBgu2kZ8CkKdzO0rAC0M6M17q1B7zzD2DOkc500mT31PFWB');
+        const elements = stripe.elements();
+        const card = elements.create('card', {
+            style: {
+                base: {
+                    fontSize: '16px',
+                    color: '#333',
+                    '::placeholder': { color: '#999' }
+                }
+            }
+        });
+        card.mount('#card-element');
+
+        async function checkPaymentStatus() {
+            try {
+                const response = await fetch('/api/user/' + user.id);
+                const data = await response.json();
+                const statusEl = document.getElementById('paymentStatus');
+
+                if (data.stripe_customer_id) {
+                    statusEl.textContent = 'Added';
+                    statusEl.classList.remove('inactive');
+                    statusEl.classList.add('active');
+                }
+            } catch (err) {
+                console.error('Error checking payment status:', err);
+            }
+        }
+
+        async function savePaymentMethod() {
+            const btn = document.getElementById('saveCardBtn');
+            const message = document.getElementById('paymentMessage');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            try {
+                const { paymentMethod, error } = await stripe.createPaymentMethod({
+                    type: 'card',
+                    card: card,
+                    billing_details: { email: user.email }
+                });
+
+                if (error) {
+                    message.textContent = error.message;
+                    message.className = 'message error';
+                    btn.disabled = false;
+                    btn.textContent = 'Save Card';
+                    return;
+                }
+
+                // Send to server
+                const response = await fetch('/api/user/payment-method', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: user.id,
+                        paymentMethodId: paymentMethod.id
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    message.textContent = 'Payment method saved successfully!';
+                    message.className = 'message success';
+                    checkPaymentStatus();
+                } else {
+                    message.textContent = data.error || 'Failed to save payment method';
+                    message.className = 'message error';
+                }
+            } catch (err) {
+                message.textContent = 'Connection error. Please try again.';
+                message.className = 'message error';
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Save Card';
+        }
+
+        function logout() {
+            sessionStorage.removeItem('user');
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

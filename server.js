@@ -357,6 +357,67 @@ app.get('/api/users', async (req, res) => {
     }
 });
 
+// Get user by ID
+app.get('/api/user/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            'SELECT id, username, email, stripe_customer_id, created_at FROM users WHERE id = $1',
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
+// Update user payment method
+app.post('/api/user/payment-method', async (req, res) => {
+    try {
+        const { userId, paymentMethodId } = req.body;
+
+        // Get existing customer or create new one
+        const userResult = await pool.query(
+            'SELECT stripe_customer_id FROM users WHERE id = $1',
+            [userId]
+        );
+
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        let stripeCustomerId = userResult.rows[0].stripe_customer_id;
+
+        // If no customer exists, create one
+        if (!stripeCustomerId && stripe) {
+            const user = userResult.rows[0];
+            const customer = await stripe.customers.create({
+                email: user.email,
+                payment_method: paymentMethodId,
+                invoice_settings: {
+                    default_payment_method: paymentMethodId
+                }
+            });
+            stripeCustomerId = customer.id;
+        }
+
+        // Update user with payment method
+        await pool.query(
+            'UPDATE users SET stripe_customer_id = $1 WHERE id = $2',
+            [stripeCustomerId, userId]
+        );
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
 // Tutor login API
 app.post('/api/tutor/login', (req, res) => {
     const { password } = req.body;
