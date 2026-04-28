@@ -638,6 +638,7 @@
                         slot_hour: selectedSlotData.hour
                     })
                 });
+                const data = await response.json();
                 if (response.ok) {
                     if (selectedSlot) {
                         selectedSlot.classList.remove('pending');
@@ -646,7 +647,8 @@
                         selectedSlot.dataset.status = 'confirmed';
                     }
                     closeModal();
-                    generateCalendar(currentWeekOffset);
+                } else {
+                    alert(data.error || 'Error confirming session');
                 }
             } catch (err) {
                 alert('Error confirming session');
@@ -667,6 +669,7 @@
                         slot_hour: selectedSlotData.hour
                     })
                 });
+                const data = await response.json();
                 if (response.ok) {
                     if (selectedSlot) {
                         selectedSlot.classList.remove('pending');
@@ -675,6 +678,8 @@
                         selectedSlot.dataset.status = 'available';
                     }
                     closeModal();
+                } else {
+                    alert(data.error || 'Error rejecting session');
                 }
             } catch (err) {
                 alert('Error rejecting session');
