@@ -65,7 +65,7 @@ async function initDB() {
 
         // Add free_sessions column if it doesn't exist (for existing databases)
         try {
-            await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS free_sessions INTEGER DEFAULT 0`);
+            await client.query(`ALTER TABLE users ADD COLUMN free_sessions INTEGER DEFAULT 0`);
         } catch (e) {
             // Column might already exist, ignore error
         }
@@ -93,7 +93,7 @@ async function initDB() {
 
         // Add free_session_used column if it doesn't exist (for existing databases)
         try {
-            await client.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS free_session_used BOOLEAN DEFAULT FALSE`);
+            await client.query(`ALTER TABLE sessions ADD COLUMN free_session_used BOOLEAN DEFAULT FALSE`);
         } catch (e) {
             // Column might already exist, ignore error
         }
