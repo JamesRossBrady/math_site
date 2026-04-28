@@ -232,7 +232,7 @@ app.post('/api/sessions/confirm', async (req, res) => {
                 await stripe.paymentIntents.create({
                     amount: price,
                     currency: 'usd',
-                    customer: stripe_customer_id,
+                    payment_method: stripe_customer_id,
                     confirm: true,
                     automatic_payment_methods: { enabled: true }
                 });
@@ -397,38 +397,12 @@ app.get('/api/user/:id', async (req, res) => {
 app.post('/api/user/payment-method', async (req, res) => {
     try {
         const { userId, paymentMethodId } = req.body;
-        console.log('Saving payment for user:', userId);
+        console.log('Saving payment for user:', userId, 'pm:', paymentMethodId);
 
-        // Get existing customer or create new one
-        const userResult = await pool.query(
-            'SELECT stripe_customer_id FROM users WHERE id = $1',
-            [userId]
-        );
-
-        if (userResult.rows.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        let stripeCustomerId = userResult.rows[0].stripe_customer_id;
-        console.log('Existing stripe customer:', stripeCustomerId);
-
-        // If no customer exists, create one
-        if (!stripeCustomerId && stripe) {
-            const user = userResult.rows[0];
-            const customer = await stripe.customers.create({
-                email: user.email,
-                payment_method: paymentMethodId,
-                invoice_settings: {
-                    default_payment_method: paymentMethodId
-                }
-            });
-            stripeCustomerId = customer.id;
-        }
-
-        // Update user with payment method
+        // Just save the payment method ID directly (no Stripe customer needed)
         await pool.query(
             'UPDATE users SET stripe_customer_id = $1 WHERE id = $2',
-            [stripeCustomerId, userId]
+            [paymentMethodId, userId]
         );
 
         res.json({ success: true });
