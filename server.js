@@ -386,6 +386,7 @@ app.get('/api/user/:id', async (req, res) => {
 app.post('/api/user/payment-method', async (req, res) => {
     try {
         const { userId, paymentMethodId } = req.body;
+        console.log('Saving payment for user:', userId);
 
         // Get existing customer or create new one
         const userResult = await pool.query(
@@ -398,6 +399,7 @@ app.post('/api/user/payment-method', async (req, res) => {
         }
 
         let stripeCustomerId = userResult.rows[0].stripe_customer_id;
+        console.log('Existing stripe customer:', stripeCustomerId);
 
         // If no customer exists, create one
         if (!stripeCustomerId && stripe) {
@@ -420,7 +422,7 @@ app.post('/api/user/payment-method', async (req, res) => {
 
         res.json({ success: true });
     } catch (err) {
-        console.error(err);
+        console.error('Payment method error:', err);
         res.status(500).json({ error: 'Database error' });
     }
 });
