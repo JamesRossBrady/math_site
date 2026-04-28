@@ -293,6 +293,19 @@ app.get('/api/sessions/details', async (req, res) => {
     }
 });
 
+// Get all users (for tutor dashboard)
+app.get('/api/users', async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT id, username, email, created_at FROM users ORDER BY created_at DESC'
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
 // Tutor login API
 app.post('/api/tutor/login', (req, res) => {
     const { password } = req.body;
