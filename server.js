@@ -158,6 +158,16 @@ app.post('/api/sessions/book', async (req, res) => {
     try {
         const { slot_date, slot_hour, subject, textbook, chapter: struggling, userId } = req.body;
 
+        // Check if user has payment method
+        const userResult = await pool.query(
+            'SELECT stripe_customer_id FROM users WHERE id = $1',
+            [userId]
+        );
+
+        if (userResult.rows.length === 0 || !userResult.rows[0].stripe_customer_id) {
+            return res.status(400).json({ error: 'Add payment method in account settings before booking' });
+        }
+
         const result = await pool.query(
             `UPDATE sessions
              SET status = 'pending', student_id = $7, subject = $3, textbook = $4, chapter = $5, struggling = $6, updated_at = CURRENT_TIMESTAMP
