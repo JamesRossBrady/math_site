@@ -58,6 +58,7 @@ async function initDB() {
                 email VARCHAR(255) UNIQUE NOT NULL,
                 password_hash VARCHAR(255) NOT NULL,
                 stripe_customer_id VARCHAR(255),
+                free_sessions INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
@@ -76,6 +77,7 @@ async function initDB() {
                 chapter VARCHAR(255),
                 struggling TEXT,
                 paid BOOLEAN DEFAULT FALSE,
+                free_session_used BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(slot_date, slot_hour)
@@ -156,24 +158,34 @@ app.get('/api/sessions', async (req, res) => {
 // Book a session (create pending request)
 app.post('/api/sessions/book', async (req, res) => {
     try {
-        const { slot_date, slot_hour, subject, textbook, chapter: struggling, userId } = req.body;
+        const { slot_date, slot_hour, subject, textbook, chapter: struggling, userId, useFreeSession } = req.body;
 
-        // Check if user has payment method
+        // Check if user has payment method OR free sessions
         const userResult = await pool.query(
-            'SELECT stripe_customer_id FROM users WHERE id = $1',
+            'SELECT stripe_customer_id, free_sessions FROM users WHERE id = $1',
             [userId]
         );
 
-        if (userResult.rows.length === 0 || !userResult.rows[0].stripe_customer_id) {
-            return res.status(400).json({ error: 'Add payment method in account settings before booking' });
+        if (userResult.rows.length === 0) {
+            return res.status(400).json({ error: 'User not found' });
+        }
+
+        const { stripe_customer_id, free_sessions } = userResult.rows[0];
+
+        // Determine if this booking will use a free session
+        const willUseFree = (useFreeSession === true || !stripe_customer_id) && free_sessions > 0;
+
+        // Allow booking if they have a payment method OR free sessions
+        if (!stripe_customer_id && free_sessions <= 0) {
+            return res.status(400).json({ error: 'Add payment method or use a free session in account settings before booking' });
         }
 
         const result = await pool.query(
             `UPDATE sessions
-             SET status = 'pending', student_id = $7, subject = $3, textbook = $4, chapter = $5, struggling = $6, updated_at = CURRENT_TIMESTAMP
+             SET status = 'pending', student_id = $7, subject = $3, textbook = $4, chapter = $5, struggling = $6, free_session_used = $8, updated_at = CURRENT_TIMESTAMP
              WHERE slot_date = $1 AND slot_hour = $2 AND status = 'available'
              RETURNING id, slot_date, slot_hour, status`,
-            [slot_date, slot_hour, subject, textbook, chapter, struggling, userId]
+            [slot_date, slot_hour, subject, textbook, chapter, struggling, userId, willUseFree]
         );
 
         if (result.rows.length === 0) {
@@ -187,14 +199,14 @@ app.post('/api/sessions/book', async (req, res) => {
     }
 });
 
-// Confirm a session (and charge student)
+// Confirm a session (and charge student or use free session)
 app.post('/api/sessions/confirm', async (req, res) => {
     try {
         const { slot_date, slot_hour } = req.body;
 
         // First get the session to find student_id
         const sessionResult = await pool.query(
-            `SELECT s.student_id, s.price, u.stripe_customer_id
+            `SELECT s.student_id, s.price, s.free_session_used, u.stripe_customer_id, u.free_sessions
              FROM sessions s
              JOIN users u ON s.student_id = u.id
              WHERE s.slot_date = $1 AND s.slot_hour = $2 AND s.status = 'pending'`,
@@ -205,11 +217,14 @@ app.post('/api/sessions/confirm', async (req, res) => {
             return res.status(400).json({ error: 'Session not found or not pending' });
         }
 
-        const { student_id, price, stripe_customer_id } = sessionResult.rows[0];
+        const { student_id, price, stripe_customer_id, free_sessions, free_session_used } = sessionResult.rows[0];
 
-        // Charge if student has payment method
+        // Check if this session is marked as using a free session
+        const usingFreeSession = free_session_used === true;
+
+        // Charge if student has payment method and not using free session
         let paymentFailed = false;
-        if (stripe && stripe_customer_id && price) {
+        if (!usingFreeSession && stripe && stripe_customer_id && price) {
             try {
                 await stripe.paymentIntents.create({
                     amount: price,
@@ -231,6 +246,14 @@ app.post('/api/sessions/confirm', async (req, res) => {
                 [slot_date, slot_hour]
             );
             return res.status(400).json({ error: 'Payment failed. Student needs to update payment method.' });
+        }
+
+        // If using free session, decrement the user's free_sessions count
+        if (usingFreeSession && free_sessions > 0) {
+            await pool.query(
+                'UPDATE users SET free_sessions = free_sessions - 1 WHERE id = $1',
+                [student_id]
+            );
         }
 
         // Mark as confirmed
@@ -348,9 +371,35 @@ app.get('/api/sessions/details', async (req, res) => {
 app.get('/api/users', async (req, res) => {
     try {
         const result = await pool.query(
-            'SELECT id, username, email, created_at FROM users ORDER BY created_at DESC'
+            'SELECT id, username, email, free_sessions, created_at FROM users ORDER BY created_at DESC'
         );
         res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
+// Update free sessions for a user (tutor grants/removes free sessions)
+app.post('/api/user/free-sessions', async (req, res) => {
+    try {
+        const { userId, amount } = req.body;
+
+        if (!userId || amount === undefined) {
+            return res.status(400).json({ error: 'userId and amount required' });
+        }
+
+        // amount can be positive (add) or negative (remove)
+        const result = await pool.query(
+            'UPDATE users SET free_sessions = free_sessions + $1 WHERE id = $2 RETURNING id, username, free_sessions',
+            [amount, userId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json(result.rows[0]);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Database error' });
