@@ -72,6 +72,10 @@ async function initDB() {
 
 // Initialize database with test sessions
 async function initSessions() {
+    if (!pool) {
+        console.log('No database, skipping session init');
+        return;
+    }
     const client = await pool.connect();
     try {
         // Check if sessions table is empty
