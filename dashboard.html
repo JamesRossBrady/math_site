@@ -552,6 +552,8 @@
             const chapter = document.getElementById('chapter').value;
             const struggling = document.getElementById('struggling').value;
 
+            const user = JSON.parse(sessionStorage.getItem('user'));
+
             try {
                 const response = await fetch('/api/sessions/book', {
                     method: 'POST',
@@ -562,7 +564,8 @@
                         subject,
                         textbook,
                         chapter,
-                        struggling
+                        struggling,
+                        userId: user.id
                     })
                 });
 

@@ -66,13 +66,16 @@ async function initDB() {
         await client.query(`
             CREATE TABLE IF NOT EXISTS sessions (
                 id SERIAL PRIMARY KEY,
+                student_id INTEGER,
                 slot_date DATE NOT NULL,
                 slot_hour INTEGER NOT NULL CHECK (slot_hour >= 8 AND slot_hour <= 18),
                 status VARCHAR(20) DEFAULT 'available',
+                price INTEGER DEFAULT 5000,
                 subject VARCHAR(100),
                 textbook VARCHAR(255),
                 chapter VARCHAR(255),
                 struggling TEXT,
+                paid BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(slot_date, slot_hour)
@@ -153,14 +156,14 @@ app.get('/api/sessions', async (req, res) => {
 // Book a session (create pending request)
 app.post('/api/sessions/book', async (req, res) => {
     try {
-        const { slot_date, slot_hour, subject, textbook, chapter, struggling } = req.body;
+        const { slot_date, slot_hour, subject, textbook, chapter: struggling, userId } = req.body;
 
         const result = await pool.query(
             `UPDATE sessions
-             SET status = 'pending', subject = $3, textbook = $4, chapter = $5, struggling = $6, updated_at = CURRENT_TIMESTAMP
+             SET status = 'pending', student_id = $7, subject = $3, textbook = $4, chapter = $5, struggling = $6, updated_at = CURRENT_TIMESTAMP
              WHERE slot_date = $1 AND slot_hour = $2 AND status = 'available'
              RETURNING id, slot_date, slot_hour, status`,
-            [slot_date, slot_hour, subject, textbook, chapter, struggling]
+            [slot_date, slot_hour, subject, textbook, chapter, struggling, userId]
         );
 
         if (result.rows.length === 0) {
@@ -174,22 +177,60 @@ app.post('/api/sessions/book', async (req, res) => {
     }
 });
 
-// Confirm a session
+// Confirm a session (and charge student)
 app.post('/api/sessions/confirm', async (req, res) => {
     try {
         const { slot_date, slot_hour } = req.body;
 
+        // First get the session to find student_id
+        const sessionResult = await pool.query(
+            `SELECT s.student_id, s.price, u.stripe_customer_id
+             FROM sessions s
+             JOIN users u ON s.student_id = u.id
+             WHERE s.slot_date = $1 AND s.slot_hour = $2 AND s.status = 'pending'`,
+            [slot_date, slot_hour]
+        );
+
+        if (sessionResult.rows.length === 0) {
+            return res.status(400).json({ error: 'Session not found or not pending' });
+        }
+
+        const { student_id, price, stripe_customer_id } = sessionResult.rows[0];
+
+        // Charge if student has payment method
+        let paymentFailed = false;
+        if (stripe && stripe_customer_id && price) {
+            try {
+                await stripe.paymentIntents.create({
+                    amount: price,
+                    currency: 'usd',
+                    customer: stripe_customer_id,
+                    confirm: true,
+                    automatic_payment_methods: { enabled: true }
+                });
+            } catch (stripeErr) {
+                console.error('Payment failed:', stripeErr);
+                paymentFailed = true;
+            }
+        }
+
+        if (paymentFailed) {
+            // Reject the session if payment fails
+            await pool.query(
+                `UPDATE sessions SET status = 'available', student_id = NULL, subject = NULL, textbook = NULL, chapter = NULL, struggling = NULL, updated_at = CURRENT_TIMESTAMP WHERE slot_date = $1 AND slot_hour = $2`,
+                [slot_date, slot_hour]
+            );
+            return res.status(400).json({ error: 'Payment failed. Student needs to update payment method.' });
+        }
+
+        // Mark as confirmed
         const result = await pool.query(
             `UPDATE sessions
-             SET status = 'confirmed', updated_at = CURRENT_TIMESTAMP
+             SET status = 'confirmed', paid = TRUE, updated_at = CURRENT_TIMESTAMP
              WHERE slot_date = $1 AND slot_hour = $2 AND status = 'pending'
              RETURNING id, slot_date, slot_hour, status`,
             [slot_date, slot_hour]
         );
-
-        if (result.rows.length === 0) {
-            return res.status(400).json({ error: 'Session not found or not pending' });
-        }
 
         res.json(result.rows[0]);
     } catch (err) {
