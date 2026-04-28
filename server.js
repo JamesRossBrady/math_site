@@ -62,6 +62,23 @@ async function initDB() {
             )
         `);
 
+        // Create sessions table
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS sessions (
+                id SERIAL PRIMARY KEY,
+                slot_date DATE NOT NULL,
+                slot_hour INTEGER NOT NULL CHECK (slot_hour >= 8 AND slot_hour <= 18),
+                status VARCHAR(20) DEFAULT 'available',
+                subject VARCHAR(100),
+                textbook VARCHAR(255),
+                chapter VARCHAR(255),
+                struggling TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(slot_date, slot_hour)
+            )
+        `);
+
         console.log('Database tables initialized');
     } catch (err) {
         console.error('Error initializing database:', err);
