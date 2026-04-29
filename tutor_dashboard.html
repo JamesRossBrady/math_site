@@ -112,6 +112,20 @@
             cursor: not-allowed;
         }
 
+        .student-item .delete-user-btn {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .student-item .delete-user-btn:hover {
+            background-color: #d32f2f;
+        }
+
         .calendar-wrapper {
             flex: 1;
         }
@@ -804,11 +818,26 @@
                             <span class="free-sessions-count">${freeSessions} free</span>
                             <button class="free-sessions-btn remove" onclick="updateFreeSessions(${user.id}, -1)" title="Remove 1 free session" ${freeSessions <= 0 ? 'disabled' : ''}>-</button>
                         </div>
+                        <button class="delete-user-btn" onclick="deleteUser(${user.id}, '${user.username}')" title="Delete user">Delete</button>
                     `;
                     list.appendChild(li);
                 });
             } catch (err) {
                 console.error('Error fetching students:', err);
+            }
+        }
+
+        async function deleteUser(userId, username) {
+            if (!confirm('Delete user "' + username + '"? This cannot be undone.')) return;
+            try {
+                const response = await fetch('/api/users/' + userId, { method: 'DELETE' });
+                if (response.ok) {
+                    fetchStudents();
+                } else {
+                    alert('Failed to delete user');
+                }
+            } catch (err) {
+                alert('Error deleting user');
             }
         }
 

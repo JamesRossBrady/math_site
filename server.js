@@ -344,6 +344,18 @@ app.get('/api/users', async (req, res) => {
     }
 });
 
+// Delete a user
+app.delete('/api/users/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await pool.query('DELETE FROM users WHERE id = $1', [id]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
 // Update free sessions for a user
 app.post('/api/user/free-sessions', async (req, res) => {
     try {
