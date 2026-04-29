@@ -157,10 +157,11 @@ app.get('/api/sessions', async (req, res) => {
     try {
         const { start_date, end_date } = req.query;
         const result = await pool.query(
-            `SELECT id, TO_CHAR(slot_date, 'YYYY-MM-DD') as slot_date, slot_hour, status, subject, textbook, chapter, struggling, created_at, updated_at
-             FROM sessions
-             WHERE slot_date >= $1 AND slot_date <= $2
-             ORDER BY slot_date, slot_hour`,
+            `SELECT s.id, TO_CHAR(s.slot_date, 'YYYY-MM-DD') as slot_date, s.slot_hour, s.status, s.subject, s.textbook, s.chapter, s.struggling, s.created_at, s.updated_at, u.username as student_name
+             FROM sessions s
+             LEFT JOIN users u ON s.student_id = u.id
+             WHERE s.slot_date >= $1 AND s.slot_date <= $2
+             ORDER BY s.slot_date, s.slot_hour`,
             [start_date, end_date]
         );
         res.json(result.rows);
@@ -175,7 +176,7 @@ app.post('/api/sessions/book', async (req, res) => {
     try {
         const { slot_date, slot_hour, subject, textbook, chapter, struggling, userId } = req.body;
 
-        // Check if user has payment method
+        // Check if user exists (payment optional - defer to confirmation)
         const userResult = await pool.query(
             'SELECT stripe_customer_id FROM users WHERE id = $1',
             [userId]
@@ -183,13 +184,6 @@ app.post('/api/sessions/book', async (req, res) => {
 
         if (userResult.rows.length === 0) {
             return res.status(400).json({ error: 'User not found' });
-        }
-
-        const { stripe_customer_id } = userResult.rows[0];
-
-        // Allow booking if they have a payment method
-        if (!stripe_customer_id) {
-            return res.status(400).json({ error: 'Add payment method in account settings before booking' });
         }
 
         const result = await pool.query(
@@ -211,50 +205,20 @@ app.post('/api/sessions/book', async (req, res) => {
     }
 });
 
-// Confirm a session (and charge student)
+// Confirm a session (no payment - tutor waives or student pays later)
 app.post('/api/sessions/confirm', async (req, res) => {
     try {
         const { slot_date, slot_hour } = req.body;
 
-        // First get the session to find student_id
+        // First get the session
         const sessionResult = await pool.query(
-            `SELECT s.student_id, s.price, u.stripe_customer_id
-             FROM sessions s
-             JOIN users u ON s.student_id = u.id
-             WHERE s.slot_date = $1 AND s.slot_hour = $2 AND s.status = 'pending'`,
+            `SELECT s.student_id FROM sessions s WHERE s.slot_date = $1 AND s.slot_hour = $2 AND s.status = 'pending'`,
             [slot_date, slot_hour]
         );
 
         if (sessionResult.rows.length === 0) {
             return res.status(400).json({ error: 'Session not found or not pending' });
         }
-
-        const { student_id, price, stripe_customer_id } = sessionResult.rows[0];
-
-        // Charge if student has payment method
-        let paymentFailed = false;
-        if (stripe && stripe_customer_id && price) {
-            try {
-                await stripe.paymentIntents.create({
-                    amount: price,
-                    currency: 'usd',
-                    payment_method: stripe_customer_id,
-                    confirm: true,
-                    automatic_payment_methods: { enabled: true }
-                });
-            } catch (stripeErr) {
-                console.error('Payment failed:', stripeErr);
-                paymentFailed = true;
-            }
-        }
-
-        if (paymentFailed) {
-            // Reject the session if payment fails
-            await pool.query(
-                `UPDATE sessions SET status = 'available', student_id = NULL, subject = NULL, textbook = NULL, chapter = NULL, struggling = NULL, updated_at = CURRENT_TIMESTAMP WHERE slot_date = $1 AND slot_hour = $2`,
-                [slot_date, slot_hour]
-            );
-            return res.status(400).json({ error: 'Payment failed. Student needs to update payment method.' });
         }
 
         // Mark as confirmed
