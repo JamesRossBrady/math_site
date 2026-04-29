@@ -219,7 +219,6 @@ app.post('/api/sessions/confirm', async (req, res) => {
         if (sessionResult.rows.length === 0) {
             return res.status(400).json({ error: 'Session not found or not pending' });
         }
-        }
 
         // Mark as confirmed
         const result = await pool.query(
