@@ -453,7 +453,10 @@
     <!-- Request Details Modal -->
     <div class="modal" id="requestModal">
         <div class="modal-content">
-            <h3>Session Request</h3>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                <h3 style="margin:0;">Session Request</h3>
+                <button onclick="closeModal()" style="background:none;border:none;font-size:24px;cursor:pointer;">&times;</button>
+            </div>
             <div class="modal-banner" id="modalBanner"></div>
             <div class="detail-group">
                 <label>Student</label>
