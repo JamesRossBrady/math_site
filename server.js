@@ -69,9 +69,15 @@ async function initDB() {
                 email VARCHAR(255) UNIQUE NOT NULL,
                 password_hash VARCHAR(255) NOT NULL,
                 stripe_customer_id VARCHAR(255),
+                free_sessions INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+
+        // Add free_sessions column if missing
+        try {
+            await client.query(`ALTER TABLE users ADD COLUMN free_sessions INTEGER DEFAULT 0`);
+        } catch (e) { /* ignore */ }
 
         // Create sessions table
         await client.query(`
@@ -366,9 +372,30 @@ app.get('/api/sessions/details', async (req, res) => {
 app.get('/api/users', async (req, res) => {
     try {
         const result = await pool.query(
-            'SELECT id, username, email, created_at FROM users ORDER BY created_at DESC'
+            'SELECT id, username, email, free_sessions, created_at FROM users ORDER BY created_at DESC'
         );
         res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
+// Update free sessions for a user
+app.post('/api/user/free-sessions', async (req, res) => {
+    try {
+        const { userId, amount } = req.body;
+        if (!userId || amount === undefined) {
+            return res.status(400).json({ error: 'userId and amount required' });
+        }
+        const result = await pool.query(
+            'UPDATE users SET free_sessions = free_sessions + $1 WHERE id = $2 RETURNING id, username, free_sessions',
+            [amount, userId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        res.json(result.rows[0]);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Database error' });
@@ -380,7 +407,7 @@ app.get('/api/user/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
-            'SELECT id, username, email, stripe_customer_id, created_at FROM users WHERE id = $1',
+            'SELECT id, username, email, stripe_customer_id, free_sessions, created_at FROM users WHERE id = $1',
             [id]
         );
         if (result.rows.length === 0) {
