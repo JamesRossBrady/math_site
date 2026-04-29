@@ -679,6 +679,7 @@
                     banner.textContent = 'Session accepted!';
                     banner.className = 'modal-banner success';
                     closeModal();
+                    generateCalendar(currentWeekOffset);
                 } else {
                     banner.textContent = data.error || 'Error accepting session';
                     banner.className = 'modal-banner error';
@@ -715,6 +716,7 @@
                     banner.textContent = 'Session rejected';
                     banner.className = 'modal-banner error';
                     closeModal();
+                    generateCalendar(currentWeekOffset);
                 } else {
                     banner.textContent = data.error || 'Error rejecting session';
                     banner.className = 'modal-banner error';
