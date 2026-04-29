@@ -752,6 +752,7 @@
         }
 
         function closeModal() {
+            console.log('closeModal called');
             document.getElementById('requestModal').classList.remove('active');
             const banner = document.getElementById('modalBanner');
             if (banner) {
