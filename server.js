@@ -344,15 +344,22 @@ app.get('/api/users', async (req, res) => {
     }
 });
 
-// Delete a user
+// Delete a user and their sessions
 app.delete('/api/users/:id', async (req, res) => {
+    const client = await pool.connect();
     try {
         const { id } = req.params;
-        await pool.query('DELETE FROM users WHERE id = $1', [id]);
+        await client.query('BEGIN');
+        await client.query('DELETE FROM sessions WHERE student_id = $1', [id]);
+        await client.query('DELETE FROM users WHERE id = $1', [id]);
+        await client.query('COMMIT');
         res.json({ success: true });
     } catch (err) {
+        await client.query('ROLLBACK');
         console.error(err);
         res.status(500).json({ error: 'Database error' });
+    } finally {
+        client.release();
     }
 });
 
