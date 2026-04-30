@@ -253,6 +253,12 @@ app.post('/api/sessions/confirm', async (req, res) => {
                 'UPDATE users SET free_sessions = free_sessions - 1 WHERE id = $1',
                 [student_id]
             );
+        } else {
+            // Give a free session if none available (Stripe temporarily disabled)
+            await pool.query(
+                'UPDATE users SET free_sessions = free_sessions + 1 WHERE id = $1',
+                [student_id]
+            );
         }
         /* TODO: Re-enable Stripe charging later - currently not working
         } else if (user.stripe_customer_id && stripe && process.env.ENABLE_CHARGES === 'true') {
