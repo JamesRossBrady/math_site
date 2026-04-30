@@ -464,12 +464,11 @@
 
                     const session = sessions.find(s => s.slot_date === slotDateStr && s.slot_hour === hour);
 
-                    // Check if slot is in the past (MST = UTC-6 in April)
+                    // Check if slot is in the past
+                    // Parse slot as local time and compare to local now
+                    const slotLocal = new Date(slotDateStr + 'T' + hour + ':00:00');
                     const now = new Date();
-                    const mstOffset = -6 * 60 * 60 * 1000; // UTC-6
-                    const mstNow = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + mstOffset);
-                    const slotDateTime = new Date(slotDateStr + 'T' + hour + ':00:00');
-                    const isPast = slotDateTime < mstNow;
+                    const isPast = slotLocal < now;
 
                     if (isPast) {
                         slot.className = 'time-slot unavailable';
