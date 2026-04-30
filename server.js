@@ -209,6 +209,7 @@ app.post('/api/sessions/book', async (req, res) => {
 
         // Use a free session if available
         if (hasFreeSessions) {
+            console.log('Decrementing free session for user', userId);
             await pool.query(
                 'UPDATE users SET free_sessions = free_sessions - 1 WHERE id = $1',
                 [userId]

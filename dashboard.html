@@ -540,6 +540,7 @@
             try {
                 const response = await fetch('/api/user/' + user.id);
                 const data = await response.json();
+                console.log('User data:', data);
 
                 if (!data.stripe_customer_id && (!data.free_sessions || data.free_sessions <= 0)) {
                     alert('Please add a payment method or use a free session before booking.\nRedirecting to settings...');
