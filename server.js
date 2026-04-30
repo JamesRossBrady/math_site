@@ -226,14 +226,57 @@ app.post('/api/sessions/confirm', async (req, res) => {
     try {
         const { slot_date, slot_hour } = req.body;
 
-        // First get the session
+        // First get the session and student
         const sessionResult = await pool.query(
-            `SELECT s.student_id FROM sessions s WHERE s.slot_date = $1 AND s.slot_hour = $2 AND s.status = 'pending'`,
+            `SELECT s.student_id, s.paid FROM sessions s WHERE s.slot_date = $1 AND s.slot_hour = $2 AND s.status = 'pending'`,
             [slot_date, slot_hour]
         );
 
         if (sessionResult.rows.length === 0) {
             return res.status(400).json({ error: 'Session not found or not pending' });
+        }
+
+        const student_id = sessionResult.rows[0].student_id;
+        const alreadyPaid = sessionResult.rows[0].paid;
+
+        // Get student info
+        const userResult = await pool.query(
+            'SELECT stripe_customer_id, free_sessions FROM users WHERE id = $1',
+            [student_id]
+        );
+
+        if (userResult.rows.length === 0) {
+            return res.status(400).json({ error: 'Student not found' });
+        }
+
+        const user = userResult.rows[0];
+        let charged = false;
+
+        // Check if student already used a free session (paid=true means they had credit)
+        if (alreadyPaid) {
+            // Already used free session, no charge
+        } else if (user.free_sessions > 0) {
+            // Use free session credit
+            await pool.query(
+                'UPDATE users SET free_sessions = free_sessions - 1 WHERE id = $1',
+                [student_id]
+            );
+        } else if (user.stripe_customer_id && stripe) {
+            // Charge $25
+            try {
+                await stripe.paymentIntents.create({
+                    amount: 2500,
+                    currency: 'usd',
+                    payment_method: user.stripe_customer_id,
+                    confirm: true,
+                    off_session: true,
+                    description: 'Math tutoring session'
+                });
+                charged = true;
+            } catch (chargeErr) {
+                console.error('Charge failed:', chargeErr.message);
+                // Allow anyway if charge fails, tutor can handle manually
+            }
         }
 
         // Mark as confirmed
@@ -245,7 +288,7 @@ app.post('/api/sessions/confirm', async (req, res) => {
             [slot_date, slot_hour]
         );
 
-        res.json(result.rows[0]);
+        res.json({ ...result.rows[0], charged });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Database error' });

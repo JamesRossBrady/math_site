@@ -548,8 +548,6 @@
                 const userSessions = allSessions.filter(s => s.student_id == user.id && (s.status === 'pending' || s.status === 'confirmed'));
                 const activeSessions = userSessions.length;
 
-                alert('DEBUG: free_sessions=' + data.free_sessions + ', active=' + activeSessions + ', hasCredit=' + (data.free_sessions > activeSessions) + ', hasCard=' + !!data.stripe_customer_id);
-
                 const hasFreeCredit = data.free_sessions > activeSessions;
                 const hasPayment = !!data.stripe_customer_id;
 
