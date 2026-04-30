@@ -254,6 +254,7 @@ app.post('/api/sessions/confirm', async (req, res) => {
                 // Create customer if not exists
                 let customerId = user.stripe_customer_id;
                 if (!user.stripe_customer_id.startsWith('cus_')) {
+                    console.log('Creating Stripe customer for:', user.email);
                     const customer = await stripe.customers.create({
                         email: user.email,
                         payment_method: user.stripe_customer_id
