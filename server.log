@@ -1,0 +1,29 @@
+Server running on port 3000
+/home/jamesrossbrady/Desktop/math_site/node_modules/pg-pool/index.js:45
+    Error.captureStackTrace(err)
+          ^
+
+error: password authentication failed for user "jamesrossbrady"
+    at /home/jamesrossbrady/Desktop/math_site/node_modules/pg-pool/index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async initSessions (/home/jamesrossbrady/Desktop/math_site/server.js:130:20) {
+  length: 110,
+  severity: 'FATAL',
+  code: '28P01',
+  detail: undefined,
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'auth.c',
+  line: '331',
+  routine: 'auth_failed'
+}
+
+Node.js v20.20.2

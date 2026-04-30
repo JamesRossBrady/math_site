@@ -232,6 +232,13 @@ app.post('/api/sessions/book', async (req, res) => {
             [parsedDate, parsedHour, subject, textbook, chapter, struggling, parsedUserId]
         );
 
+        // DEBUG: Check if session exists
+        const checkResult = await pool.query(
+            'SELECT id, slot_date, slot_hour, status FROM sessions WHERE slot_date = $1 AND slot_hour = $2',
+            [parsedDate, parsedHour]
+        );
+        console.log('DEBUG session check:', checkResult.rows);
+
         console.log('UPDATE query params:', [parsedDate, parsedHour, subject, textbook, chapter, struggling, parsedUserId]);
         console.log('UPDATE result rows:', result.rows.length);
 
