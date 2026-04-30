@@ -646,7 +646,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         slot_date: selectedDate,
-                        slot_hour: selectedHour,
+                        slot_hour: parseInt(selectedHour),
                         subject,
                         textbook,
                         chapter,
@@ -666,6 +666,7 @@
                     alert(`Session requested for ${selectedHour}:00 on ${selectedDate}!\nWaiting for confirmation.`);
                 } else {
                     const data = await response.json();
+                    console.log('Booking error:', data);
                     alert(data.error || 'Failed to book session');
                 }
             } catch (err) {
