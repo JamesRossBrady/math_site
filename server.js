@@ -248,7 +248,7 @@ app.post('/api/sessions/confirm', async (req, res) => {
                 [student_id]
             );
         } else if (user.stripe_customer_id && stripe && process.env.ENABLE_CHARGES === 'true') {
-            console.log(' stripeobj:', stripe, 'ENABLE_CHARGES:', process.env.ENABLE_CHARGES);
+            console.log('Entering charge try block - customerId:', user.stripe_customer_id);
             // Charge $0.50 (50 cents = 50 in Stripe format)
             try {
                 // Create customer if not exists
