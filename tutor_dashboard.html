@@ -524,12 +524,12 @@
             clearTimeout(refreshTimeout);
             refreshTimeout = setTimeout(() => {
                 generateCalendar(currentWeekOffset);
+                if (session && session.status === 'pending') {
+                    alert('New session requested for ' + session.slot_date + ' at ' + session.slot_hour + ':00');
+                } else if (session && session.status === 'available') {
+                    alert('Session on ' + session.slot_date + ' has been canceled.');
+                }
             }, 100);
-            if (session && session.status === 'pending') {
-                alert('New session requested for ' + session.slot_date + ' at ' + session.slot_hour + ':00');
-            } else if (session && session.status === 'available') {
-                alert('Session on ' + session.slot_date + ' has been canceled.');
-            }
         });
 
         const hours = [];
