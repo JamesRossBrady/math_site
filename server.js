@@ -256,9 +256,9 @@ app.post('/api/sessions/confirm', async (req, res) => {
         } else if (user.stripe_customer_id && stripe && process.env.ENABLE_CHARGES === 'true') {
             console.log('Entering charge try block - customerId:', user.stripe_customer_id);
             // Charge $0.50 (50 cents = 50 in Stripe format)
+            console.log('Creating payment intent with pm:', user.stripe_customer_id);
             try {
-                // Just use payment intent with payment method directly
-                await stripe.paymentIntents.create({
+                const intent = await stripe.paymentIntents.create({
                     amount: 50,
                     currency: 'usd',
                     payment_method: user.stripe_customer_id,
@@ -266,6 +266,7 @@ app.post('/api/sessions/confirm', async (req, res) => {
                     off_session: true,
                     description: 'Math tutoring session'
                 });
+                console.log('PaymentIntent created:', intent.id, 'status:', intent.status);
                 charged = true;
             } catch (chargeErr) {
                 console.error('Charge failed:', chargeErr.message);
