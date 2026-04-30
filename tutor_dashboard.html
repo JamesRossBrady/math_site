@@ -533,6 +533,11 @@
             }, 100);
         });
 
+        // Listen for user deletion
+        socket.on('user-deleted', () => {
+            fetchStudents();
+        });
+
         const hours = [];
         for (let h = 8; h <= 18; h++) {
             hours.push(h);
