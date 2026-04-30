@@ -599,7 +599,7 @@
                         slot.dataset.status = 'past';
                     } else if (session && session.status === 'confirmed') {
                         slot.className = 'time-slot confirmed';
-                        slot.textContent = 'Confirmed';
+                        slot.innerHTML = 'Confirmed<br><small style="font-size:9px;text-align:center;display:block;">' + (session.student_name || 'Student') + '</small>';
                     } else if (session && session.status === 'pending') {
                         slot.className = 'time-slot pending';
                         slot.innerHTML = 'Pending<br><small style="font-size:9px;text-align:center;display:block;">' + (session.student_name || 'Student') + '</small>';

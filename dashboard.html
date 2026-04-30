@@ -433,6 +433,7 @@
 
             // Fetch sessions from database
             const sessions = await fetchSessions(currentStartDate, endDate);
+            currentSessions = sessions; // Store for global access
 
             const startDay = currentStartDate.getDate();
             const endDay = endDate.getDate();
@@ -495,7 +496,7 @@
                     } else if (session) {
                         if (session.status === 'confirmed') {
                             slot.className = 'time-slot confirmed';
-                            slot.textContent = 'Confirmed';
+                            slot.innerHTML = 'Confirmed<br><small style="font-size:9px;">' + (session.student_name || '') + '</small>';
                         } else if (session.status === 'pending') {
                             slot.className = 'time-slot pending';
                             slot.textContent = 'Pending';
@@ -543,8 +544,12 @@
             } else if (status === 'pending') {
                 alert('This session is pending confirmation.');
             } else if (status === 'confirmed') {
-                const date = slot.dataset.date;
-                const hour = slot.dataset.hour;
+                // Only allow if this student owns the session
+                const session = currentSessions.find(s => s.slot_date === date && s.slot_hour === parseInt(hour) && s.status === 'confirmed');
+                if (!session || session.student_id != user.id) {
+                    alert('You can only join your own confirmed sessions.');
+                    return;
+                }
                 window.location.href = 'video.html?date=' + date + '&hour=' + hour;
             }
         }
@@ -645,6 +650,7 @@
         }
 
         let currentWeekOffset = 0;
+        let currentSessions = []; // Store sessions for bookSlot access
         function logout() {
             sessionStorage.removeItem('user');
             window.location.href = 'index.html';
