@@ -349,17 +349,17 @@
 
                 <div class="form-group">
                     <label for="textbook">Textbook</label>
-                    <input type="text" id="textbook" name="textbook" placeholder="e.g., Algebra 2 by Smith" required>
+                    <input type="text" id="textbook" name="textbook" value="Algebra" required>
                 </div>
 
                 <div class="form-group">
                     <label for="chapter">Chapter</label>
-                    <input type="text" id="chapter" name="chapter" placeholder="e.g., Chapter 5: Quadratic Equations" required>
+                    <input type="text" id="chapter" name="chapter" value="General" required>
                 </div>
 
                 <div class="form-group">
                     <label for="struggling">What are you struggling with?</label>
-                    <textarea id="struggling" name="struggling" maxlength="2000" placeholder="Describe what you're having trouble with..." oninput="updateWordCount()"></textarea>
+                    <textarea id="struggling" name="struggling" maxlength="2000" oninput="updateWordCount()">N/A</textarea>
                     <p class="word-count"><span id="wordCount">0</span> / 2000 words</p>
                 </div>
 
@@ -675,6 +675,11 @@
         }
 
         generateCalendar(0);
+
+        // Auto-refresh calendar every minute to update past slots
+        setInterval(() => {
+            generateCalendar(currentWeekOffset);
+        }, 60000);
     </script>
 </body>
 </html>
