@@ -194,11 +194,14 @@ app.post('/api/sessions/book', async (req, res) => {
         // Parse slot_date and slot_hour properly
         const parsedDate = String(slot_date);
         const parsedHour = parseInt(slot_hour);
+        const parsedUserId = parseInt(userId);
+
+        console.log('Parsed values:', { parsedDate, parsedHour, parsedUserId });
 
         // Check user for free_sessions OR payment method
         const userResult = await pool.query(
             'SELECT stripe_customer_id, free_sessions FROM users WHERE id = $1',
-            [parseInt(userId)]
+            [parsedUserId]
         );
 
         if (userResult.rows.length === 0) {
@@ -210,7 +213,7 @@ app.post('/api/sessions/book', async (req, res) => {
         // Count user's pending/confirmed sessions
         const sessionCount = await pool.query(
             "SELECT COUNT(*) FROM sessions WHERE student_id = $1 AND status IN ('pending', 'confirmed')",
-            [parseInt(userId)]
+            [parsedUserId]
         );
         const activeSessions = parseInt(sessionCount.rows[0].count);
 
@@ -226,8 +229,11 @@ app.post('/api/sessions/book', async (req, res) => {
              SET status = 'pending', student_id = $7, subject = $3, textbook = $4, chapter = $5, struggling = $6, updated_at = CURRENT_TIMESTAMP
              WHERE slot_date = $1 AND slot_hour = $2 AND status = 'available'
              RETURNING id, slot_date, slot_hour, status`,
-            [parsedDate, parsedHour, subject, textbook, chapter, struggling, parseInt(userId)]
+            [parsedDate, parsedHour, subject, textbook, chapter, struggling, parsedUserId]
         );
+
+        console.log('UPDATE query params:', [parsedDate, parsedHour, subject, textbook, chapter, struggling, parsedUserId]);
+        console.log('UPDATE result rows:', result.rows.length);
 
         if (result.rows.length === 0) {
             return res.status(400).json({ error: 'Slot not available' });
