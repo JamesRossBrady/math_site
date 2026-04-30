@@ -48,13 +48,33 @@ app.get('/api/debug/sessions', async (req, res) => {
     }
 });
 
-// Debug endpoint - check what dates exist
-app.get('/api/debug/alldates', async (req, res) => {
+// Debug endpoint - force reinitialize sessions
+app.post('/api/debug/reinit', async (req, res) => {
     try {
-        const result = await pool.query(
-            'SELECT DISTINCT slot_date FROM sessions ORDER BY slot_date'
-        );
-        res.json(result.rows);
+        const client = await pool.connect();
+        try {
+            // Delete all non-confirmed sessions
+            await client.query("DELETE FROM sessions WHERE status != 'confirmed'");
+
+            // Create sessions for next 28 days starting from April 30, 2026
+            const startDate = new Date('2026-04-30');
+
+            for (let d = 0; d < 28; d++) {
+                const date = new Date(startDate);
+                date.setDate(date.getDate() + d);
+                const dateStr = date.toISOString().split('T')[0];
+
+                for (let h = 8; h <= 18; h++) {
+                    await client.query(
+                        'INSERT INTO sessions (slot_date, slot_hour, status) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+                        [dateStr, h, 'available']
+                    );
+                }
+            }
+            res.json({ success: true, message: 'Sessions reinitialized from 2026-04-30' });
+        } finally {
+            client.release();
+        }
     } catch (err) {
         res.json({ error: err.message });
     }
