@@ -609,7 +609,7 @@
 
                     slot.dataset.hour = hour;
                     slot.dataset.date = session ? session.slot_date : slotDateStr;
-                    slot.dataset.status = session ? session.status : 'available';
+                    slot.dataset.status = isPast ? 'past' : (session ? session.status : 'available');
                     slot.dataset.subject = session ? (session.subject || '') : '';
                     slot.dataset.textbook = session ? (session.textbook || '') : '';
                     slot.dataset.chapter = session ? (session.chapter || '') : '';

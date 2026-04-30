@@ -496,7 +496,7 @@
                     slot.dataset.hour = hour;
                     slot.dataset.day = d;
                     slot.dataset.date = slotDateStr;
-                    slot.dataset.status = session ? session.status : 'available';
+                    slot.dataset.status = isPast ? 'past' : (session ? session.status : 'available');
 
                     slot.addEventListener('click', () => bookSlot(slot, hour, d, slotDateStr));
 
