@@ -519,8 +519,11 @@
         socket.emit('join-calendar');
 
         // Listen for session updates
-        socket.on('session-updated', () => {
+        socket.on('session-updated', (session) => {
             fetchSessions();
+            if (session && session.status === 'available') {
+                alert('Session on ' + session.slot_date + ' has been canceled.');
+            }
         });
 
         const hours = [];
