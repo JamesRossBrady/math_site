@@ -790,6 +790,8 @@
         }
 
         function changeWeeks(offset) {
+            // Don't allow going to previous weeks
+            if (offset < 0 && currentWeekOffset <= 0) return;
             currentWeekOffset += offset;
             generateCalendar(currentWeekOffset);
         }
