@@ -615,7 +615,7 @@
                     const session = sessions.find(s => s.slot_date === slotDateStr && s.slot_hour === hour);
 
                     // Check if slot is in the past
-                    const slotLocal = new Date(slotDateStr + 'T' + hour + ':00:00');
+                    const slotLocal = new Date(slotDateStr + 'T' + String(hour).padStart(2, '0') + ':00:00');
                     const now = new Date();
                     const isPast = slotLocal < now;
 
