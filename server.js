@@ -176,14 +176,22 @@ app.post('/api/sessions/book', async (req, res) => {
     try {
         const { slot_date, slot_hour, subject, textbook, chapter, struggling, userId } = req.body;
 
-        // Check if user exists (payment optional - defer to confirmation)
+        // Check user for free_sessions OR payment method
         const userResult = await pool.query(
-            'SELECT stripe_customer_id FROM users WHERE id = $1',
+            'SELECT stripe_customer_id, free_sessions FROM users WHERE id = $1',
             [userId]
         );
 
         if (userResult.rows.length === 0) {
             return res.status(400).json({ error: 'User not found' });
+        }
+
+        const user = userResult.rows[0];
+        const hasFreeSessions = user.free_sessions > 0;
+        const hasPayment = !!user.stripe_customer_id;
+
+        if (!hasFreeSessions && !hasPayment) {
+            return res.status(400).json({ error: 'Add payment method or get free sessions first' });
         }
 
         const result = await pool.query(
@@ -196,6 +204,14 @@ app.post('/api/sessions/book', async (req, res) => {
 
         if (result.rows.length === 0) {
             return res.status(400).json({ error: 'Slot not available' });
+        }
+
+        // Use a free session if available
+        if (hasFreeSessions) {
+            await pool.query(
+                'UPDATE users SET free_sessions = free_sessions - 1 WHERE id = $1',
+                [userId]
+            );
         }
 
         res.json(result.rows[0]);
