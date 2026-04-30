@@ -260,14 +260,29 @@ app.post('/api/sessions/confirm', async (req, res) => {
                 [student_id]
             );
         } else if (user.stripe_customer_id && stripe && process.env.ENABLE_CHARGES === 'true') {
-            // Charge $25 (only if ENABLE_CHARGES=true)
+            // Charge $0.50 (50 cents = 50 in Stripe format)
             try {
+                // Create customer if not exists
+                let customerId = user.stripe_customer_id;
+                if (!user.stripe_customer_id.startsWith('cus_')) {
+                    const customer = await stripe.customers.create({
+                        email: user.email,
+                        payment_method: user.stripe_customer_id
+                    });
+                    customerId = customer.id;
+                    // Update with customer ID
+                    await pool.query(
+                        'UPDATE users SET stripe_customer_id = $1 WHERE id = $2',
+                        [customerId, student_id]
+                    );
+                }
+
                 await stripe.paymentIntents.create({
-                    amount: 2500,
+                    amount: 50,
                     currency: 'usd',
-                    payment_method: user.stripe_customer_id,
-                    confirm: true,
+                    customer: customerId,
                     off_session: true,
+                    confirm: true,
                     description: 'Math tutoring session'
                 });
                 charged = true;
@@ -508,10 +523,32 @@ app.post('/api/user/payment-method', async (req, res) => {
         const { userId, paymentMethodId } = req.body;
         console.log('Saving payment for user:', userId, 'pm:', paymentMethodId);
 
-        // Just save the payment method ID directly (no Stripe customer needed)
+        // Get user email
+        const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+        if (userResult.rows.length === 0) {
+            return res.status(400).json({ error: 'User not found' });
+        }
+
+        let stripeCustomerId = paymentMethodId;
+
+        // If Stripe is available, create a Customer
+        if (stripe) {
+            try {
+                const customer = await stripe.customers.create({
+                    email: userResult.rows[0].email,
+                    payment_method: paymentMethodId
+                });
+                stripeCustomerId = customer.id;
+                console.log('Created Stripe customer:', customer.id);
+            } catch (err) {
+                console.error('Error creating customer:', err.message);
+                // Continue with just storing the payment method
+            }
+        }
+
         await pool.query(
             'UPDATE users SET stripe_customer_id = $1 WHERE id = $2',
-            [paymentMethodId, userId]
+            [stripeCustomerId, userId]
         );
 
         res.json({ success: true });
