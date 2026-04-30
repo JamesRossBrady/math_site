@@ -537,6 +537,7 @@
         socket.on('user-deleted', () => {
             console.log('Received user-deleted event');
             fetchStudentList();
+            generateCalendar(currentWeekOffset);
         });
 
         const hours = [];
