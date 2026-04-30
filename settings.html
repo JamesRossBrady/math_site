@@ -235,22 +235,31 @@
         // Check payment status
         checkPaymentStatus();
 
-        // Initialize Stripe with Appearance API
+        // Initialize Stripe
+        console.log('Stripe object:', typeof Stripe);
+        console.log('js.stripe.com loaded:', typeof window.Stripe !== 'undefined');
+
+        if (typeof Stripe === 'undefined') {
+            console.error('Stripe.js did not load!');
+            document.getElementById('paymentMessage').textContent = 'Stripe failed to load. Check your internet connection.';
+            document.getElementById('paymentMessage').className = 'message error';
+        }
+
         const stripe = Stripe('pk_test_51TQsYzANlBqrmq5SJzkQ6FfHX9ynz5dT38mZs5rF4ijtDywITjJMBgu2kZ8CkKdzO0rAC0M6M17q1B7zzD2DOkc500mT31PFWB');
-        const elements = stripe.elements({
-            appearance: {
-                theme: 'stripe',
-                variables: {
-                    fontSize: '16px',
-                    colorPrimary: '#333'
+        const elements = stripe.elements();
+        const card = elements.create('card', {
+            style: {
+                base: {
+                    fontSize: '16px'
                 }
             }
         });
-        const card = elements.create('card');
 
-        console.log('Stripe initialized, mounting card element...');
-        card.mount('#card-element');
-        console.log('Card element mounted');
+        setTimeout(() => {
+            console.log('Mounting card...');
+            card.mount('#card-element');
+            console.log('Mounted');
+        }, 100);
 
         async function checkPaymentStatus() {
             try {
