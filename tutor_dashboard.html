@@ -633,10 +633,10 @@
                         slot.dataset.status = 'past';
                     } else if (session && session.status === 'confirmed') {
                         slot.className = 'time-slot confirmed';
-                        slot.innerHTML = 'Confirmed<br><small style="font-size:9px;text-align:center;display:block;">' + (session.student_name || 'Student') + '</small>';
+                        slot.innerHTML = '<div style="text-align:center;line-height:1.2;"><div>Confirmed</div><span style="font-size:9px;">' + (session.student_name || 'Student') + '</span></div>';
                     } else if (session && session.status === 'pending') {
                         slot.className = 'time-slot pending';
-                        slot.innerHTML = 'Pending<br><small style="font-size:9px;text-align:center;display:block;">' + (session.student_name || 'Student') + '</small>';
+                        slot.innerHTML = '<div style="text-align:center;line-height:1.2;"><div>Pending</div><span style="font-size:9px;">' + (session.student_name || 'Student') + '</span></div>';
                     } else if (session && session.status === 'unavailable') {
                         slot.className = 'time-slot unavailable';
                         slot.textContent = 'Unavailable';
