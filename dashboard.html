@@ -496,10 +496,26 @@
                     } else if (session) {
                         if (session.status === 'confirmed') {
                             slot.className = 'time-slot confirmed';
-                            slot.innerHTML = 'Confirmed<br><small style="font-size:9px;text-align:center;display:block;">' + (session.student_name || '') + '</small>';
+                            slot.textContent = 'Confirmed';
+                            if (session.student_name) {
+                                const nameSpan = document.createElement('div');
+                                nameSpan.style.fontSize = '9px';
+                                nameSpan.style.textAlign = 'center';
+                                nameSpan.style.marginTop = '2px';
+                                nameSpan.textContent = session.student_name;
+                                slot.appendChild(nameSpan);
+                            }
                         } else if (session.status === 'pending') {
                             slot.className = 'time-slot pending';
-                            slot.innerHTML = 'Pending<br><small style="font-size:9px;text-align:center;display:block;">' + (session.student_name || '') + '</small>';
+                            slot.textContent = 'Pending';
+                            if (session.student_name) {
+                                const nameSpan = document.createElement('div');
+                                nameSpan.style.fontSize = '9px';
+                                nameSpan.style.textAlign = 'center';
+                                nameSpan.style.marginTop = '2px';
+                                nameSpan.textContent = session.student_name;
+                                slot.appendChild(nameSpan);
+                            }
                         } else if (session.status === 'unavailable') {
                             slot.className = 'time-slot unavailable';
                             slot.textContent = 'Unavailable';
