@@ -406,7 +406,12 @@
                 if (session.status === 'confirmed') {
                     alert('Your session on ' + session.slot_date + ' at ' + displayHour + ':00 ' + ampm + ' has been confirmed!');
                 } else if (session.status === 'available') {
-                    alert('Your session on ' + session.slot_date + ' at ' + displayHour + ':00 ' + ampm + ' has been canceled by James.');
+                    const wasPending = session.subject != null;
+                    if (wasPending) {
+                        alert('Your session on ' + session.slot_date + ' at ' + displayHour + ':00 ' + ampm + ' has been rejected by James.');
+                    } else {
+                        alert('Your session on ' + session.slot_date + ' at ' + displayHour + ':00 ' + ampm + ' has been canceled by James.');
+                    }
                 }
             }
         });

@@ -315,6 +315,9 @@ app.post('/api/sessions/reject', async (req, res) => {
             return res.status(400).json({ error: 'Session not found or not pending' });
         }
 
+        // Notify all calendars
+        io.to('calendar').emit('session-updated', result.rows[0]);
+
         res.json(result.rows[0]);
     } catch (err) {
         console.error(err);
