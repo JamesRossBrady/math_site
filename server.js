@@ -612,17 +612,7 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// Debug: list session dates
-app.get('/api/debug/dates', async (req, res) => {
-    try {
-        const result = await pool.query(
-            'SELECT DISTINCT slot_date FROM sessions ORDER BY slot_date LIMIT 10'
-        );
-        res.json(result.rows);
-    } catch (err) {
-        res.json({ error: err.message });
-    }
-});
+//
 
 const PORT = process.env.PORT || 3000;
 
