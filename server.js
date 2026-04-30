@@ -491,41 +491,47 @@ app.post('/api/login', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-// Socket.IO for whiteboard sync
-let whiteboardState = {
-    lines: [],
-    texts: []
-};
+// Socket.IO for whiteboard sync (per room)
+const whiteboardRooms = {}; // { roomId: { lines: [], texts: [] } }
 
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
-    // Send current whiteboard state to new user
-    socket.emit('whiteboard-state', whiteboardState);
+    // Join a whiteboard room
+    socket.on('join-room', (roomId) => {
+        socket.join(roomId);
+        // Initialize room if needed
+        if (!whiteboardRooms[roomId]) {
+            whiteboardRooms[roomId] = { lines: [], texts: [] };
+        }
+        // Send current whiteboard state to new user
+        socket.emit('whiteboard-state', whiteboardRooms[roomId]);
+    });
 
     // Handle drawing line
-    socket.on('draw-line', (data) => {
-        whiteboardState.lines.push(data);
-        socket.broadcast.emit('draw-line', data);
+    socket.on('draw', (data) => {
+        const roomId = Array.from(socket.rooms).find(r => r !== socket.id);
+        if (roomId && whiteboardRooms[roomId]) {
+            whiteboardRooms[roomId].lines.push(data);
+            socket.to(roomId).emit('draw', data);
+        }
     });
 
     // Handle text add
-    socket.on('add-text', (data) => {
-        whiteboardState.texts.push(data);
-        socket.broadcast.emit('add-text', data);
+    socket.on('text', (data) => {
+        const roomId = Array.from(socket.rooms).find(r => r !== socket.id);
+        if (roomId && whiteboardRooms[roomId]) {
+            whiteboardRooms[roomId].texts.push(data);
+            socket.to(roomId).emit('text', data);
+        }
     });
 
     // Handle clear
-    socket.on('clear-whiteboard', () => {
-        whiteboardState = { lines: [], texts: [] };
-        io.emit('clear-whiteboard');
-    });
-
-    // Handle undo (remove last line)
-    socket.on('undo', () => {
-        if (whiteboardState.lines.length > 0) {
-            const removedLine = whiteboardState.lines.pop();
-            io.emit('undo', removedLine);
+    socket.on('clear', () => {
+        const roomId = Array.from(socket.rooms).find(r => r !== socket.id);
+        if (roomId && whiteboardRooms[roomId]) {
+            whiteboardRooms[roomId] = { lines: [], texts: [] };
+            socket.to(roomId).emit('clear');
         }
     });
 
@@ -534,7 +540,7 @@ io.on('connection', (socket) => {
     });
 });
 
-// Listen on all interfaces for external access
+    // Listen on all interfaces for external access
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
     initDB();

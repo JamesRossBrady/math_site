@@ -102,6 +102,10 @@
         const urlParams = new URLSearchParams(window.location.search);
         const sessionDate = urlParams.get('date');
         const sessionHour = urlParams.get('hour');
+        const roomId = sessionDate + '-' + sessionHour;
+
+        // Join the room for this session
+        socket.emit('join-room', roomId);
         document.getElementById('backLink').href = 'video.html?' + urlParams.toString();
 
         // Display session time (50 minute sessions)
