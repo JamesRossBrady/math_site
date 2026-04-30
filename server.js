@@ -184,6 +184,8 @@ app.post('/api/sessions/book', async (req, res) => {
             return res.status(400).json({ error: 'No sessions left. Add payment method.' });
         }
 
+        console.log('Update query:', { parsedDate, parsedHour });
+
         const result = await pool.query(
             `UPDATE sessions
              SET status = 'pending', student_id = $7, subject = $3, textbook = $4, chapter = $5, struggling = $6, updated_at = CURRENT_TIMESTAMP
