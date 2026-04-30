@@ -927,10 +927,10 @@
         fetchStudentList();
         generateCalendar(0);
 
-        // Auto-refresh calendar every minute to update past slots
+        // Auto-refresh calendar every hour to update past slots
         setInterval(() => {
             generateCalendar(currentWeekOffset);
-        }, 60000);
+        }, 3600000);
     </script>
 </body>
 </html>
