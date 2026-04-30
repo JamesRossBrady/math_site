@@ -524,7 +524,7 @@
             clearTimeout(refreshTimeout);
             refreshTimeout = setTimeout(() => {
                 generateCalendar(currentWeekOffset);
-                fetchStudents();
+                fetchStudentList();
                 if (session && session.status === 'pending') {
                     alert('New session requested for ' + session.slot_date + ' at ' + session.slot_hour + ':00');
                 } else if (session && session.status === 'available') {
@@ -536,7 +536,7 @@
         // Listen for user deletion
         socket.on('user-deleted', () => {
             console.log('Received user-deleted event');
-            fetchStudents();
+            fetchStudentList();
         });
 
         const hours = [];
@@ -896,18 +896,18 @@
                 const response = await fetch('/api/users/' + userId, { method: 'DELETE' });
                 const data = await response.json();
                 if (response.ok && data.success) {
-                    fetchStudents();
+                    fetchStudentList();
                     fetchSessions(); // Refresh calendar
                 } else {
                     console.error('Delete error:', data);
                     // Don't show error, just refresh
-                    fetchStudents();
+                    fetchStudentList();
                     fetchSessions();
                 }
             } catch (err) {
                 console.error('Delete error:', err);
                 // Still refresh on error
-                fetchStudents();
+                fetchStudentList();
                 fetchSessions();
             }
         }
