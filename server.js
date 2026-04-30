@@ -192,8 +192,6 @@ app.post('/api/sessions/book', async (req, res) => {
         const hasPayment = !!user.stripe_customer_id;
 
         if (!hasFreeSessions && !hasPayment) {
-
-        if (!hasFreeSessions && !hasPayment) {
             return res.status(400).json({ error: 'Add payment method or get free sessions first' });
         }
 
