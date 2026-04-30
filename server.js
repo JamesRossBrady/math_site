@@ -335,7 +335,7 @@ app.post('/api/sessions/cancel', async (req, res) => {
 
         const result = await pool.query(
             `UPDATE sessions
-             SET status = 'available', student_id = NULL, subject = NULL, textbook = NULL, chapter = NULL, struggling = NULL, updated_at = CURRENT_TIMESTAMP
+             SET status = 'available', student_id = NULL, subject = NULL, textbook = NULL, chapter = NULL, struggling = NULL, paid = FALSE, updated_at = CURRENT_TIMESTAMP
              WHERE slot_date = $1 AND slot_hour = $2 AND status IN ('pending', 'confirmed')
              RETURNING id, slot_date, slot_hour, status`,
             [slot_date, slot_hour]
