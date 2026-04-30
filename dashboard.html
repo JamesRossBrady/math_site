@@ -380,10 +380,23 @@
 
     <script>
         // Check if user is logged in
-        const user = sessionStorage.getItem('user');
-        if (!user) {
+        const storedUser = sessionStorage.getItem('user');
+        if (!storedUser) {
             window.location.href = 'signin.html';
         }
+
+        const user = JSON.parse(storedUser);
+
+        // Verify user still exists in database
+        fetch('/api/user/' + user.id).then(r => {
+            if (!r.ok) {
+                sessionStorage.removeItem('user');
+                alert('Your account was deleted. Please sign up again.');
+                window.location.href = 'signup.html';
+            }
+        }).catch(() => {
+            // Allow if API fails
+        });
 
         const hours = [];
         for (let h = 8; h <= 18; h++) {
