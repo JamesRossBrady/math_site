@@ -666,7 +666,6 @@
                     alert(`Session requested for ${selectedHour}:00 on ${selectedDate}!\nWaiting for confirmation.`);
                 } else {
                     const data = await response.json();
-                    console.log('Booking error:', data);
                     alert(data.error || 'Failed to book session');
                 }
             } catch (err) {
