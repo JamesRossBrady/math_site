@@ -540,11 +540,16 @@
             try {
                 const response = await fetch('/api/user/' + user.id);
                 const data = await response.json();
+                console.log('User data:', data);
 
                 // Count active sessions
                 const sessionsResponse = await fetch('/api/sessions?start_date=2026-01-01&end_date=2026-12-31');
                 const allSessions = await sessionsResponse.json();
-                const activeSessions = allSessions.filter(s => s.student_name === user.username && (s.status === 'pending' || s.status === 'confirmed')).length;
+                console.log('All sessions:', allSessions);
+
+                const userSessions = allSessions.filter(s => s.student_name === user.username && (s.status === 'pending' || s.status === 'confirmed'));
+                const activeSessions = userSessions.length;
+                console.log('User:', user.username, 'Active sessions:', activeSessions, 'Free credits:', data.free_sessions);
 
                 const hasFreeCredit = data.free_sessions > activeSessions;
                 const hasPayment = !!data.stripe_customer_id;
