@@ -520,7 +520,8 @@
 
         // Listen for session updates
         socket.on('session-updated', (session) => {
-            fetchSessions();
+            // Refresh the calendar
+            generateCalendar(currentWeekOffset);
             if (session && session.status === 'pending') {
                 alert('New session requested for ' + session.slot_date + ' at ' + session.slot_hour + ':00');
             } else if (session && session.status === 'available') {
