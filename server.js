@@ -453,6 +453,10 @@ app.delete('/api/users/:id', async (req, res) => {
         await client.query('DELETE FROM users WHERE id = $1', [id]);
         console.log('Deleted user:', id);
         await client.query('COMMIT');
+
+        // Notify all calendars about user deletion
+        io.to('calendar').emit('user-deleted', { userId: id });
+
         res.json({ success: true });
     } catch (err) {
         await client.query('ROLLBACK');

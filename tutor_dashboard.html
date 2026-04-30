@@ -524,6 +524,7 @@
             clearTimeout(refreshTimeout);
             refreshTimeout = setTimeout(() => {
                 generateCalendar(currentWeekOffset);
+                fetchStudents();
                 if (session && session.status === 'pending') {
                     alert('New session requested for ' + session.slot_date + ' at ' + session.slot_hour + ':00');
                 } else if (session && session.status === 'available') {

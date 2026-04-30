@@ -416,6 +416,16 @@
             }, 100);
         });
 
+        // Listen for user deletion (kicked by tutor)
+        socket.on('user-deleted', (data) => {
+            const user = JSON.parse(sessionStorage.getItem('user'));
+            if (user && data.userId == user.id) {
+                sessionStorage.removeItem('user');
+                alert('Your account has been deleted by the tutor.');
+                window.location.href = 'index.html';
+            }
+        });
+
         const hours = [];
         for (let h = 8; h <= 18; h++) {
             hours.push(h);
