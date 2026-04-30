@@ -246,45 +246,31 @@ app.post('/api/sessions/confirm', async (req, res) => {
 
         // Check if student already used a free session (paid=true means they had credit)
         if (alreadyPaid) {
-            // Already used free session, no charge
+            // Already paid
         } else if (user.free_sessions > 0) {
-            // Use free session credit
             await pool.query(
                 'UPDATE users SET free_sessions = free_sessions - 1 WHERE id = $1',
                 [student_id]
             );
-        } else {
-            // Give a free session if none available (Stripe temporarily disabled)
-            await pool.query(
-                'UPDATE users SET free_sessions = free_sessions + 1 WHERE id = $1',
-                [student_id]
-            );
-        }
-        /* TODO: Re-enable Stripe charging later - currently not working
         } else if (user.stripe_customer_id && stripe && process.env.ENABLE_CHARGES === 'true') {
-            console.log('Entering charge try block - customerId:', user.stripe_customer_id);
-            // Charge $0.50 (50 cents = 50 in Stripe format)
-            console.log('Creating payment intent with pm:', user.stripe_customer_id);
+            // Try Stripe charge
             try {
-                // First verify the payment method exists
-                const pm = await stripe.paymentMethods.retrieve(user.stripe_customer_id);
-                console.log('Payment method exists:', pm.id, 'type:', pm.type);
-
                 const intent = await stripe.paymentIntents.create({
                     amount: 50,
                     currency: 'usd',
                     payment_method: user.stripe_customer_id,
-                    confirm: true,
-                    description: 'Math tutoring session',
+                    description: 'Math session'
                 });
-                console.log('PaymentIntent created:', intent.id, 'status:', intent.status);
+                console.log('Stripe intent:', intent.id, 'status:', intent.status);
                 charged = true;
-            } catch (chargeErr) {
-                console.error('Charge failed:', chargeErr.message);
-                // Allow anyway if charge fails, tutor can handle manually
+            } catch(e) {
+                console.error('Stripe:', e.message);
+                await pool.query('UPDATE users SET free_sessions = free_sessions + 1 WHERE id = $1', [student_id]);
             }
+        } else {
+            await pool.query('UPDATE users SET free_sessions = free_sessions + 1 WHERE id = $1', [student_id]);
         }
-        */
+
         // Mark as confirmed
         const result = await pool.query(
             `UPDATE sessions
