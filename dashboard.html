@@ -503,7 +503,7 @@
 
                     // Check if slot is in the past
                     // Parse slot as local time and compare to local now
-                    const slotDateTime = new Date(slotDateStr + 'T' + hour + ':00:00');
+                    const slotDateTime = new Date(slotDateStr + 'T' + String(hour).padStart(2, '0') + ':00:00');
                     const now = new Date();
                     const isPast = slotDateTime < now;
                     console.log('Slot:', slotDateStr, hour, 'Time:', slotDateTime, 'Now:', now, 'isPast:', isPast);
