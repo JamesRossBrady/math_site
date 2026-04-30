@@ -187,8 +187,11 @@ app.post('/api/sessions/book', async (req, res) => {
         }
 
         const user = userResult.rows[0];
+        console.log('Booking - user:', user.id, 'free_sessions:', user.free_sessions, 'stripe:', user.stripe_customer_id);
         const hasFreeSessions = user.free_sessions > 0;
         const hasPayment = !!user.stripe_customer_id;
+
+        if (!hasFreeSessions && !hasPayment) {
 
         if (!hasFreeSessions && !hasPayment) {
             return res.status(400).json({ error: 'Add payment method or get free sessions first' });
