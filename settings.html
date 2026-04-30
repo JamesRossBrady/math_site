@@ -245,7 +245,7 @@
             document.getElementById('paymentMessage').className = 'message error';
         }
 
-        const stripe = Stripe('pk_test_51TQsYzANlBqrmq5SJzkQ6FfHX9ynz5dT38mZs5rF4ijtDywITjJMBgu2kZ8CkKdzO0rAC0M6M17q1B7zzD2DOkc500mT31PFWB');
+        const stripe = Stripe('pk_live_51TQsYgAoZCeoX20P4eL4bGqN7XTGysrbE6ne9jjnZqEXp2So9exxgVB2Z3vQ06CHRVE6NYRxMF2kiUrHa72eNLfz00uiv3rONw');
         const elements = stripe.elements();
         const card = elements.create('card', {
             style: {
