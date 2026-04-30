@@ -235,18 +235,18 @@
         // Check payment status
         checkPaymentStatus();
 
-        // Initialize Stripe
+        // Initialize Stripe with Appearance API
         const stripe = Stripe('pk_test_51TQsYzANlBqrmq5SJzkQ6FfHX9ynz5dT38mZs5rF4ijtDywITjJMBgu2kZ8CkKdzO0rAC0M6M17q1B7zzD2DOkc500mT31PFWB');
-        const elements = stripe.elements();
-        const card = elements.create('card', {
-            style: {
-                base: {
+        const elements = stripe.elements({
+            appearance: {
+                theme: 'stripe',
+                variables: {
                     fontSize: '16px',
-                    color: '#333',
-                    '::placeholder': { color: '#999' }
+                    colorPrimary: '#333'
                 }
             }
         });
+        const card = elements.create('card');
 
         console.log('Stripe initialized, mounting card element...');
         card.mount('#card-element');
