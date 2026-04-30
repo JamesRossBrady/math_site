@@ -319,6 +319,30 @@ app.post('/api/sessions/reject', async (req, res) => {
     }
 });
 
+// Cancel a session (tutor cancels confirmed or pending)
+app.post('/api/sessions/cancel', async (req, res) => {
+    try {
+        const { slot_date, slot_hour } = req.body;
+
+        const result = await pool.query(
+            `UPDATE sessions
+             SET status = 'available', student_id = NULL, subject = NULL, textbook = NULL, chapter = NULL, struggling = NULL, updated_at = CURRENT_TIMESTAMP
+             WHERE slot_date = $1 AND slot_hour = $2 AND status IN ('pending', 'confirmed')
+             RETURNING id, slot_date, slot_hour, status`,
+            [slot_date, slot_hour]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(400).json({ error: 'Session not found' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
 // Mark a session as unavailable (tutor has plans)
 app.post('/api/sessions/unavailable', async (req, res) => {
     try {

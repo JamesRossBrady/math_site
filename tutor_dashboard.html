@@ -406,6 +406,12 @@
             color: white;
             display: none;
         }
+
+        .btn-cancel-session {
+            background-color: #f44336;
+            color: white;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -496,6 +502,7 @@
                 <button class="btn-reject" id="btnReject" onclick="rejectRequest()">Reject</button>
                 <button class="btn-confirm" id="btnConfirm" onclick="confirmRequest()">Confirm Session</button>
                 <button class="btn-start" id="btnStart" onclick="startSession()">Start Video Session</button>
+                <button class="btn-cancel-session" id="btnCancelSession" onclick="cancelSession()">Cancel Session</button>
             </div>
         </div>
     </div>
@@ -661,14 +668,43 @@
                     document.getElementById('btnReject').textContent = 'Close';
                     document.getElementById('btnReject').onclick = function() { closeModal(); };
                     document.getElementById('btnStart').style.display = 'block';
+                    document.getElementById('btnCancelSession').style.display = 'block';
                 } else {
                     document.getElementById('btnConfirm').style.display = 'block';
                     document.getElementById('btnReject').textContent = 'Reject';
                     document.getElementById('btnReject').onclick = function() { rejectRequest(); };
                     document.getElementById('btnStart').style.display = 'none';
+                    document.getElementById('btnCancelSession').style.display = 'none';
                 }
 
                 document.getElementById('requestModal').classList.add('active');
+            }
+        }
+
+        async function cancelSession() {
+            if (!selectedSlotData) return;
+            if (!confirm('Cancel this session? The student will be notified.')) return;
+            try {
+                const response = await fetch('/api/sessions/cancel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        slot_date: selectedSlotData.date,
+                        slot_hour: selectedSlotData.hour
+                    })
+                });
+                if (response.ok) {
+                    if (selectedSlot) {
+                        selectedSlot.classList.remove('confirmed', 'pending');
+                        selectedSlot.classList.add('available');
+                        selectedSlot.textContent = '50 min';
+                        selectedSlot.dataset.status = 'available';
+                    }
+                    closeModal();
+                    fetchSessions();
+                }
+            } catch (err) {
+                alert('Error cancelling session');
             }
         }
 
