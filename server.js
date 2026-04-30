@@ -214,6 +214,9 @@ app.post('/api/sessions/book', async (req, res) => {
             return res.status(400).json({ error: 'Slot not available' });
         }
 
+        // Notify all calendars
+        io.to('calendar').emit('session-updated', result.rows[0]);
+
         res.json(result.rows[0]);
     } catch (err) {
         console.error(err);
