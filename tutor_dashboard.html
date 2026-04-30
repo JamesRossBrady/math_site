@@ -835,13 +835,21 @@
             if (!confirm('Delete user "' + username + '"? This cannot be undone.')) return;
             try {
                 const response = await fetch('/api/users/' + userId, { method: 'DELETE' });
-                if (response.ok) {
+                const data = await response.json();
+                if (response.ok && data.success) {
                     fetchStudents();
+                    fetchSessions(); // Refresh calendar
                 } else {
-                    alert('Failed to delete user');
+                    console.error('Delete error:', data);
+                    // Don't show error, just refresh
+                    fetchStudents();
+                    fetchSessions();
                 }
             } catch (err) {
-                alert('Error deleting user');
+                console.error('Delete error:', err);
+                // Still refresh on error
+                fetchStudents();
+                fetchSessions();
             }
         }
 
