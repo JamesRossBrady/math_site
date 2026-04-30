@@ -506,6 +506,7 @@
                     const slotLocal = new Date(slotDateStr + 'T' + hour + ':00:00');
                     const now = new Date();
                     const isPast = slotLocal < now;
+                    console.log('Checking slot:', slotDateStr, hour, 'isPast:', isPast);
 
                     if (isPast) {
                         slot.className = 'time-slot unavailable';
