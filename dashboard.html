@@ -516,7 +516,11 @@
                     const slotDateTime = new Date(slotDateStr + 'T' + String(hour).padStart(2, '0') + ':00:00');
                     const now = new Date();
                     const isPast = slotDateTime < now;
-                    console.log('Slot:', slotDateStr, hour, 'Time:', slotDateTime, 'Now:', now, 'isPast:', isPast);
+
+                    // Check if slot is more than 2 weeks in the future
+                    const twoWeeksFromNow = new Date();
+                    twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
+                    const isTooFar = slotDateTime > twoWeeksFromNow;
 
                     if (isPast) {
                         slot.className = 'time-slot unavailable';
@@ -524,6 +528,12 @@
                         slot.style.color = '#9e9e9e';
                         slot.textContent = 'Past';
                         slot.dataset.status = 'past';
+                    } else if (isTooFar) {
+                        slot.className = 'time-slot unavailable';
+                        slot.style.backgroundColor = '#e0e0e0';
+                        slot.style.color = '#9e9e9e';
+                        slot.textContent = 'Too far';
+                        slot.dataset.status = 'too-far';
                     } else if (session) {
                         if (session.status === 'confirmed') {
                             slot.className = 'time-slot confirmed';
@@ -546,7 +556,7 @@
                     slot.dataset.hour = hour;
                     slot.dataset.day = d;
                     slot.dataset.date = slotDateStr;
-                    slot.dataset.status = isPast ? 'past' : (session ? session.status : 'available');
+                    slot.dataset.status = isPast ? 'past' : (isTooFar ? 'too-far' : (session ? session.status : 'available'));
 
                     slot.addEventListener('click', () => bookSlot(slot, hour, d, slotDateStr));
 

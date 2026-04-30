@@ -627,10 +627,21 @@
                     const now = new Date();
                     const isPast = slotLocal < now;
 
+                    // Check if slot is more than 2 weeks in the future
+                    const twoWeeksFromNow = new Date();
+                    twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
+                    const isTooFar = slotLocal > twoWeeksFromNow;
+
                     if (isPast) {
                         slot.className = 'time-slot unavailable';
                         slot.textContent = 'Past';
                         slot.dataset.status = 'past';
+                    } else if (isTooFar) {
+                        slot.className = 'time-slot unavailable';
+                        slot.style.backgroundColor = '#e0e0e0';
+                        slot.style.color = '#9e9e9e';
+                        slot.textContent = 'Too far';
+                        slot.dataset.status = 'too-far';
                     } else if (session && session.status === 'confirmed') {
                         slot.className = 'time-slot confirmed';
                         slot.innerHTML = '<div style="text-align:center;line-height:1.2;"><div>Confirmed</div><span style="font-size:9px;">' + (session.student_name || 'Student') + '</span></div>';
@@ -647,7 +658,7 @@
 
                     slot.dataset.hour = hour;
                     slot.dataset.date = session ? session.slot_date : slotDateStr;
-                    slot.dataset.status = isPast ? 'past' : (session ? session.status : 'available');
+                    slot.dataset.status = isPast ? 'past' : (isTooFar ? 'too-far' : (session ? session.status : 'available'));
                     slot.dataset.subject = session ? (session.subject || '') : '';
                     slot.dataset.textbook = session ? (session.textbook || '') : '';
                     slot.dataset.chapter = session ? (session.chapter || '') : '';
