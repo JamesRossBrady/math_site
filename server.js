@@ -151,6 +151,7 @@ app.get('/api/sessions', async (req, res) => {
 app.post('/api/sessions/book', async (req, res) => {
     try {
         const { slot_date, slot_hour, subject, textbook, chapter, struggling, userId } = req.body;
+        console.log('Book attempt:', { slot_date, slot_hour, userId });
 
         // Parse slot_date and slot_hour properly
         const parsedDate = String(slot_date);
