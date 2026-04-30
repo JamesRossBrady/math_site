@@ -336,10 +336,12 @@ app.post('/api/sessions/cancel', async (req, res) => {
             return res.status(400).json({ error: 'Session not found' });
         }
 
-        // Notify all calendars to refresh
-        io.to('calendar').emit('session-updated');
+        const cancelledSession = result.rows[0];
 
-        res.json(result.rows[0]);
+        // Notify all calendars to refresh
+        io.to('calendar').emit('session-updated', cancelledSession);
+
+        res.json(cancelledSession);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Database error' });

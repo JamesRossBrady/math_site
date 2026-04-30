@@ -404,8 +404,14 @@
         socket.emit('join-calendar');
 
         // Listen for session updates
-        socket.on('session-updated', () => {
+        socket.on('session-updated', (session) => {
             generateCalendar(currentWeekOffset);
+            if (session && session.status === 'available') {
+                const hour = session.slot_hour;
+                const ampm = hour >= 12 ? 'PM' : 'AM';
+                const displayHour = hour > 12 ? hour - 12 : hour;
+                alert('Your session on ' + session.slot_date + ' at ' + displayHour + ':00 ' + ampm + ' has been canceled by James.');
+            }
         });
 
         const hours = [];
