@@ -105,36 +105,22 @@ async function initSessions() {
     }
     const client = await pool.connect();
     try {
-        // Check if sessions table is empty
-        const result = await client.query('SELECT COUNT(*) FROM sessions');
-        if (parseInt(result.rows[0].count) === 0) {
-            // Create sessions for next 28 days (4 weeks), 8am-6pm
-            const sessions = [];
-            const today = new Date();
+        // Ensure sessions exist for next 28 days from April 30, 2026
+        const startDate = new Date('2026-04-30');
 
-            for (let d = 0; d < 28; d++) {
-                const date = new Date(today);
-                date.setDate(date.getDate() + d);
-                const dateStr = date.toISOString().split('T')[0];
+        for (let d = 0; d < 28; d++) {
+            const date = new Date(startDate);
+            date.setDate(date.getDate() + d);
+            const dateStr = date.toISOString().split('T')[0];
 
-                for (let h = 8; h <= 18; h++) {
-                    sessions.push({
-                        slot_date: dateStr,
-                        slot_hour: h,
-                        status: 'available'
-                    });
-                }
-            }
-
-            // Insert in batches
-            for (const session of sessions) {
+            for (let h = 8; h <= 18; h++) {
                 await client.query(
                     'INSERT INTO sessions (slot_date, slot_hour, status) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
-                    [session.slot_date, session.slot_hour, session.status]
+                    [dateStr, h, 'available']
                 );
             }
-            console.log('Initialized sessions database');
         }
+        console.log('Sessions ensured from 2026-04-30');
     } catch (err) {
         console.error('Error initializing sessions:', err);
     } finally {

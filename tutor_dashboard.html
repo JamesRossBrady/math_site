@@ -673,8 +673,8 @@
         function clickSlot(slot) {
             const status = slot.dataset.status;
 
-            // Toggle available/unavailable
-            if (status === 'available') {
+            // Toggle available/unavailable (allows tutor to override "too far" as well)
+            if (status === 'available' || status === 'too-far') {
                 toggleSlotStatus(slot, 'unavailable');
                 return;
             }
