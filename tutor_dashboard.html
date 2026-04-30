@@ -518,10 +518,13 @@
         const socket = io();
         socket.emit('join-calendar');
 
-        // Listen for session updates
+        // Listen for session updates (debounced)
+        let refreshTimeout = null;
         socket.on('session-updated', (session) => {
-            // Refresh the calendar
-            generateCalendar(currentWeekOffset);
+            clearTimeout(refreshTimeout);
+            refreshTimeout = setTimeout(() => {
+                generateCalendar(currentWeekOffset);
+            }, 100);
             if (session && session.status === 'pending') {
                 alert('New session requested for ' + session.slot_date + ' at ' + session.slot_hour + ':00');
             } else if (session && session.status === 'available') {

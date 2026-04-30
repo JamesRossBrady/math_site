@@ -396,9 +396,13 @@
         const socket = io();
         socket.emit('join-calendar');
 
-        // Listen for session updates
+        // Listen for session updates (debounced)
+        let refreshTimeout = null;
         socket.on('session-updated', (session) => {
-            generateCalendar(currentWeekOffset);
+            clearTimeout(refreshTimeout);
+            refreshTimeout = setTimeout(() => {
+                generateCalendar(currentWeekOffset);
+            }, 100);
             if (session) {
                 const hour = session.slot_hour;
                 const ampm = hour >= 12 ? 'PM' : 'AM';
