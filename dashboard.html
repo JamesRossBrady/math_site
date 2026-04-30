@@ -540,10 +540,17 @@
             try {
                 const response = await fetch('/api/user/' + user.id);
                 const data = await response.json();
-                console.log('User data:', data);
 
-                if (!data.stripe_customer_id && (!data.free_sessions || data.free_sessions <= 0)) {
-                    alert('Please add a payment method or use a free session before booking.\nRedirecting to settings...');
+                // Count active sessions
+                const sessionsResponse = await fetch('/api/sessions?start_date=2026-01-01&end_date=2026-12-31');
+                const allSessions = await sessionsResponse.json();
+                const activeSessions = allSessions.filter(s => s.student_name === user.username && (s.status === 'pending' || s.status === 'confirmed')).length;
+
+                const hasFreeCredit = data.free_sessions > activeSessions;
+                const hasPayment = !!data.stripe_customer_id;
+
+                if (!hasFreeCredit && !hasPayment) {
+                    alert('No sessions left. Add payment method.\nRedirecting to settings...');
                     window.location.href = 'settings.html';
                     return;
                 }

@@ -187,12 +187,19 @@ app.post('/api/sessions/book', async (req, res) => {
         }
 
         const user = userResult.rows[0];
-        console.log('Booking - user:', user.id, 'free_sessions:', user.free_sessions, 'stripe:', user.stripe_customer_id);
-        const hasFreeSessions = user.free_sessions > 0;
+
+        // Count user's pending/confirmed sessions
+        const sessionCount = await pool.query(
+            "SELECT COUNT(*) FROM sessions WHERE student_id = $1 AND status IN ('pending', 'confirmed')",
+            [userId]
+        );
+        const activeSessions = parseInt(sessionCount.rows[0].count);
+
+        const hasFreeCredit = user.free_sessions > activeSessions;
         const hasPayment = !!user.stripe_customer_id;
 
-        if (!hasFreeSessions && !hasPayment) {
-            return res.status(400).json({ error: 'Add payment method or get free sessions first' });
+        if (!hasFreeCredit && !hasPayment) {
+            return res.status(400).json({ error: 'No sessions left. Add payment method.' });
         }
 
         const result = await pool.query(
@@ -205,15 +212,6 @@ app.post('/api/sessions/book', async (req, res) => {
 
         if (result.rows.length === 0) {
             return res.status(400).json({ error: 'Slot not available' });
-        }
-
-        // Use a free session if available
-        if (hasFreeSessions) {
-            console.log('Decrementing free session for user', userId);
-            await pool.query(
-                'UPDATE users SET free_sessions = free_sessions - 1 WHERE id = $1',
-                [userId]
-            );
         }
 
         res.json(result.rows[0]);
