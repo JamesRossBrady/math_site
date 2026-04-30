@@ -236,6 +236,8 @@ app.post('/api/sessions/confirm', async (req, res) => {
         const user = userResult.rows[0];
         let charged = false;
 
+        console.log('Confirm check - free_sessions:', user.free_sessions, 'stripe_customer_id:', user.stripe_customer_id, 'stripe:', !!stripe, 'ENABLE_CHARGES:', process.env.ENABLE_CHARGES);
+
         // Check if student already used a free session (paid=true means they had credit)
         if (alreadyPaid) {
             // Already used free session, no charge
