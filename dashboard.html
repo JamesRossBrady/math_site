@@ -503,13 +503,15 @@
 
                     // Check if slot is in the past
                     // Parse slot as local time and compare to local now
-                    const slotLocal = new Date(slotDateStr + 'T' + hour + ':00:00');
+                    const slotDateTime = new Date(slotDateStr + 'T' + hour + ':00:00');
                     const now = new Date();
-                    const isPast = slotLocal < now;
-                    console.log('Checking slot:', slotDateStr, hour, 'isPast:', isPast);
+                    const isPast = slotDateTime < now;
+                    console.log('Slot:', slotDateStr, hour, 'Time:', slotDateTime, 'Now:', now, 'isPast:', isPast);
 
                     if (isPast) {
                         slot.className = 'time-slot unavailable';
+                        slot.style.backgroundColor = '#e0e0e0';
+                        slot.style.color = '#9e9e9e';
                         slot.textContent = 'Past';
                         slot.dataset.status = 'past';
                     } else if (session) {
