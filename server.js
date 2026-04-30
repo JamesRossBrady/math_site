@@ -261,8 +261,8 @@ app.post('/api/sessions/confirm', async (req, res) => {
                 'UPDATE users SET free_sessions = free_sessions - 1 WHERE id = $1',
                 [student_id]
             );
-        } else if (user.stripe_customer_id && stripe) {
-            // Charge $25
+        } else if (user.stripe_customer_id && stripe && process.env.ENABLE_CHARGES === 'true') {
+            // Charge $25 (only if ENABLE_CHARGES=true)
             try {
                 await stripe.paymentIntents.create({
                     amount: 2500,
