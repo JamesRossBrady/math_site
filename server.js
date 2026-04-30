@@ -212,11 +212,17 @@ app.post('/api/sessions/confirm', async (req, res) => {
 
         // First get the session and student
         const sessionResult = await pool.query(
-            `SELECT s.student_id, s.paid FROM sessions s WHERE s.slot_date = $1 AND s.slot_hour = $2 AND s.status = 'pending'`,
+            `SELECT s.student_id, s.paid, s.status FROM sessions s WHERE s.slot_date = $1 AND s.slot_hour = $2 AND s.status = 'pending'`,
             [slot_date, slot_hour]
         );
 
         if (sessionResult.rows.length === 0) {
+            // Check what status it actually has
+            const checkResult = await pool.query(
+                'SELECT status FROM sessions WHERE slot_date = $1 AND slot_hour = $2',
+                [slot_date, slot_hour]
+            );
+            console.log('Session status:', checkResult.rows[0]?.status);
             return res.status(400).json({ error: 'Session not found or not pending' });
         }
 
