@@ -253,6 +253,8 @@ app.post('/api/sessions/confirm', async (req, res) => {
                 'UPDATE users SET free_sessions = free_sessions - 1 WHERE id = $1',
                 [student_id]
             );
+        }
+        /* TODO: Re-enable Stripe charging later - currently not working
         } else if (user.stripe_customer_id && stripe && process.env.ENABLE_CHARGES === 'true') {
             console.log('Entering charge try block - customerId:', user.stripe_customer_id);
             // Charge $0.50 (50 cents = 50 in Stripe format)
@@ -276,7 +278,7 @@ app.post('/api/sessions/confirm', async (req, res) => {
                 // Allow anyway if charge fails, tutor can handle manually
             }
         }
-
+        */
         // Mark as confirmed
         const result = await pool.query(
             `UPDATE sessions
