@@ -460,7 +460,11 @@
                     const slot = document.createElement('div');
                     const slotDate = new Date(currentStartDate);
                     slotDate.setDate(slotDate.getDate() + d);
-                    const slotDateStr = slotDate.toISOString().split('T')[0];
+                    // Format as local date YYYY-MM-DD
+                    const y = slotDate.getFullYear();
+                    const m = String(slotDate.getMonth() + 1).padStart(2, '0');
+                    const day = String(slotDate.getDate()).padStart(2, '0');
+                    const slotDateStr = `${y}-${m}-${day}`;
 
                     const session = sessions.find(s => s.slot_date === slotDateStr && s.slot_hour === hour);
 
