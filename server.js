@@ -48,6 +48,18 @@ app.get('/api/debug/sessions', async (req, res) => {
     }
 });
 
+// Debug endpoint - check what dates exist
+app.get('/api/debug/alldates', async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT DISTINCT slot_date FROM sessions ORDER BY slot_date'
+        );
+        res.json(result.rows);
+    } catch (err) {
+        res.json({ error: err.message });
+    }
+});
+
 // Hardcoded tutor password (stored hashed with salt on server)
 const TUTOR_SALT = 'math_site_salt_2024';
 const TUTOR_PASSWORD_HASH = '703e110ea4de4bba15675565beb04f172abc91d2a885b38257dec10cfe5f8d33'; // SHA-256(salt + 'aladan64SOFT12v?')
@@ -136,6 +148,9 @@ async function initSessions() {
             const sessions = [];
             const today = new Date();
 
+            // Log what date is being used for debugging
+            console.log('Initializing sessions for date:', today.toISOString().split('T')[0]);
+
             for (let d = 0; d < 28; d++) {
                 const date = new Date(today);
                 date.setDate(date.getDate() + d);
@@ -158,6 +173,10 @@ async function initSessions() {
                 );
             }
             console.log('Initialized sessions database');
+        } else {
+            // Log what dates exist for debugging
+            const dateCheck = await client.query('SELECT DISTINCT slot_date FROM sessions ORDER BY slot_date LIMIT 5');
+            console.log('Existing session dates:', dateCheck.rows);
         }
     } catch (err) {
         console.error('Error initializing sessions:', err);
