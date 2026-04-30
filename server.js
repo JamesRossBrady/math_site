@@ -24,62 +24,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '.')));
 
-// Debug endpoint - delete this after testing
-app.get('/api/debug', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT NOW() as time');
-        res.json({ time: result.rows[0].time, db: 'working' });
-    } catch (err) {
-        res.json({ db: 'error', error: err.message });
-    }
-});
-
-// Debug endpoint - check sessions for a date
-app.get('/api/debug/sessions', async (req, res) => {
-    try {
-        const { date } = req.query;
-        const result = await pool.query(
-            'SELECT id, slot_date, slot_hour, status, student_id FROM sessions WHERE slot_date = $1 ORDER BY slot_hour',
-            [date]
-        );
-        res.json(result.rows);
-    } catch (err) {
-        res.json({ error: err.message });
-    }
-});
-
-// Debug endpoint - force reinitialize sessions
-app.post('/api/debug/reinit', async (req, res) => {
-    try {
-        const client = await pool.connect();
-        try {
-            // Delete all non-confirmed sessions
-            await client.query("DELETE FROM sessions WHERE status != 'confirmed'");
-
-            // Create sessions for next 28 days starting from April 30, 2026
-            const startDate = new Date('2026-04-30');
-
-            for (let d = 0; d < 28; d++) {
-                const date = new Date(startDate);
-                date.setDate(date.getDate() + d);
-                const dateStr = date.toISOString().split('T')[0];
-
-                for (let h = 8; h <= 18; h++) {
-                    await client.query(
-                        'INSERT INTO sessions (slot_date, slot_hour, status) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
-                        [dateStr, h, 'available']
-                    );
-                }
-            }
-            res.json({ success: true, message: 'Sessions reinitialized from 2026-04-30' });
-        } finally {
-            client.release();
-        }
-    } catch (err) {
-        res.json({ error: err.message });
-    }
-});
-
 // Hardcoded tutor password (stored hashed with salt on server)
 const TUTOR_SALT = 'math_site_salt_2024';
 const TUTOR_PASSWORD_HASH = '703e110ea4de4bba15675565beb04f172abc91d2a885b38257dec10cfe5f8d33'; // SHA-256(salt + 'aladan64SOFT12v?')
@@ -168,9 +112,6 @@ async function initSessions() {
             const sessions = [];
             const today = new Date();
 
-            // Log what date is being used for debugging
-            console.log('Initializing sessions for date:', today.toISOString().split('T')[0]);
-
             for (let d = 0; d < 28; d++) {
                 const date = new Date(today);
                 date.setDate(date.getDate() + d);
@@ -193,10 +134,6 @@ async function initSessions() {
                 );
             }
             console.log('Initialized sessions database');
-        } else {
-            // Log what dates exist for debugging
-            const dateCheck = await client.query('SELECT DISTINCT slot_date FROM sessions ORDER BY slot_date LIMIT 5');
-            console.log('Existing session dates:', dateCheck.rows);
         }
     } catch (err) {
         console.error('Error initializing sessions:', err);
@@ -227,15 +164,12 @@ app.get('/api/sessions', async (req, res) => {
 // Book a session (create pending request)
 app.post('/api/sessions/book', async (req, res) => {
     try {
-        console.log('Booking request body:', req.body);
         const { slot_date, slot_hour, subject, textbook, chapter, struggling, userId } = req.body;
 
         // Parse slot_date and slot_hour properly
         const parsedDate = String(slot_date);
         const parsedHour = parseInt(slot_hour);
         const parsedUserId = parseInt(userId);
-
-        console.log('Parsed values:', { parsedDate, parsedHour, parsedUserId });
 
         // Check user for free_sessions OR payment method
         const userResult = await pool.query(
@@ -270,16 +204,6 @@ app.post('/api/sessions/book', async (req, res) => {
              RETURNING id, slot_date, slot_hour, status`,
             [parsedDate, parsedHour, subject, textbook, chapter, struggling, parsedUserId]
         );
-
-        // DEBUG: Check if session exists
-        const checkResult = await pool.query(
-            'SELECT id, slot_date, slot_hour, status FROM sessions WHERE slot_date = $1 AND slot_hour = $2',
-            [parsedDate, parsedHour]
-        );
-        console.log('DEBUG session check:', checkResult.rows);
-
-        console.log('UPDATE query params:', [parsedDate, parsedHour, subject, textbook, chapter, struggling, parsedUserId]);
-        console.log('UPDATE result rows:', result.rows.length);
 
         if (result.rows.length === 0) {
             return res.status(400).json({ error: 'Slot not available' });
