@@ -336,6 +336,9 @@ app.post('/api/sessions/cancel', async (req, res) => {
             return res.status(400).json({ error: 'Session not found' });
         }
 
+        // Notify all calendars to refresh
+        io.to('calendar').emit('session-updated');
+
         res.json(result.rows[0]);
     } catch (err) {
         console.error(err);
@@ -582,6 +585,11 @@ const whiteboardRooms = {}; // { roomId: { lines: [], texts: [] } }
 
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
+
+    // Join a global room for calendar updates
+    socket.on('join-calendar', () => {
+        socket.join('calendar');
+    });
 
     // Join a whiteboard room
     socket.on('join-room', (roomId) => {

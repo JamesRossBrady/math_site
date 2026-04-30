@@ -507,11 +507,21 @@
         </div>
     </div>
 
+    <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
     <script>
         // Check if tutor is logged in
         if (!sessionStorage.getItem('tutorLoggedIn')) {
             window.location.href = 'tutor_login.html';
         }
+
+        // Join calendar room for real-time updates
+        const socket = io();
+        socket.emit('join-calendar');
+
+        // Listen for session updates
+        socket.on('session-updated', () => {
+            fetchSessions();
+        });
 
         const hours = [];
         for (let h = 8; h <= 18; h++) {
