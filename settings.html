@@ -247,7 +247,10 @@
                 }
             }
         });
+
+        console.log('Stripe initialized, mounting card element...');
         card.mount('#card-element');
+        console.log('Card element mounted');
 
         async function checkPaymentStatus() {
             try {
