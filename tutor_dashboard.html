@@ -535,6 +535,7 @@
 
         // Listen for user deletion
         socket.on('user-deleted', () => {
+            console.log('Received user-deleted event');
             fetchStudents();
         });
 

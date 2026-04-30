@@ -455,6 +455,7 @@ app.delete('/api/users/:id', async (req, res) => {
         await client.query('COMMIT');
 
         // Notify all calendars about user deletion
+        console.log('Emitting user-deleted for user:', id);
         io.to('calendar').emit('user-deleted', { userId: id });
 
         res.json({ success: true });
