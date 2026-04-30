@@ -288,6 +288,9 @@ app.post('/api/sessions/confirm', async (req, res) => {
             [slot_date, slot_hour]
         );
 
+        // Notify all calendars
+        io.to('calendar').emit('session-updated', result.rows[0]);
+
         res.json({ ...result.rows[0], charged });
     } catch (err) {
         console.error(err);
