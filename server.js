@@ -157,7 +157,7 @@ app.get('/api/sessions', async (req, res) => {
     try {
         const { start_date, end_date } = req.query;
         const result = await pool.query(
-            `SELECT s.id, TO_CHAR(s.slot_date, 'YYYY-MM-DD') as slot_date, s.slot_hour, s.status, s.subject, s.textbook, s.chapter, s.struggling, s.created_at, s.updated_at, u.username as student_name
+            `SELECT s.id, s.student_id, TO_CHAR(s.slot_date, 'YYYY-MM-DD') as slot_date, s.slot_hour, s.status, s.subject, s.textbook, s.chapter, s.struggling, s.created_at, s.updated_at, u.username as student_name
              FROM sessions s
              LEFT JOIN users u ON s.student_id = u.id
              WHERE s.slot_date >= $1 AND s.slot_date <= $2
