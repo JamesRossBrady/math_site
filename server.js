@@ -258,13 +258,15 @@ app.post('/api/sessions/confirm', async (req, res) => {
             // Charge $0.50 (50 cents = 50 in Stripe format)
             console.log('Creating payment intent with pm:', user.stripe_customer_id);
             try {
+                // Try with manual confirmation - create then mark for future off-session use
                 const intent = await stripe.paymentIntents.create({
                     amount: 50,
                     currency: 'usd',
                     payment_method: user.stripe_customer_id,
                     confirm: true,
-                    off_session: true,
-                    description: 'Math tutoring session'
+                    description: 'Math tutoring session',
+                    // Try without off_session first
+                    setup_future_usage: 'off_session'
                 });
                 console.log('PaymentIntent created:', intent.id, 'status:', intent.status);
                 charged = true;
