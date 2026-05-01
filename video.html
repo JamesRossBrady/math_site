@@ -87,6 +87,7 @@
     </div>
 
     <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const sessionDate = urlParams.get('date');
@@ -94,11 +95,15 @@
         const isTutor = urlParams.get('tutor') === 'true';
         const statusEl = document.getElementById('status');
 
-        const socket = io();
+        let peer = null;
         let audioStream = null;
+        let currentCall = null;
 
-        // Automatically connect audio on page load
-        async function connectAudio() {
+        // Tutor peer ID format: "session-{date}-{hour}"
+        const tutorPeerId = 'session-' + sessionDate + '-' + sessionHour;
+
+        // Initialize audio
+        async function initAudio() {
             try {
                 audioStream = await navigator.mediaDevices.getUserMedia({
                     audio: {
@@ -107,18 +112,89 @@
                         autoGainControl: true
                     }
                 });
-
-                // Connect to audio room
-                const roomId = sessionDate + '-' + sessionHour;
-                socket.emit('join-audio', roomId);
-
-                statusEl.textContent = 'Connected! Click "Open Whiteboard" to start.';
-
-                // Send audio to other participants
-                // (In production, you'd use WebRTC for peer-to-peer audio)
             } catch (err) {
-                console.error('Audio error:', err);
-                statusEl.textContent = 'Audio could not connect. You can still use the whiteboard.';
+                console.error('Mic error:', err);
+                statusEl.textContent = 'Could not access microphone. Check permissions.';
+            }
+        }
+
+        // Tutor: create peer and wait for connections
+        function setupTutor() {
+            peer = new Peer(tutorPeerId);
+
+            peer.on('open', (id) => {
+                statusEl.textContent = 'Waiting for student to connect...';
+            });
+
+            peer.on('call', (call) => {
+                // Answer with our audio stream
+                call.answer(audioStream);
+                currentCall = call;
+
+                call.on('stream', (remoteStream) => {
+                    playAudio(remoteStream);
+                    statusEl.textContent = 'Connected! Click "Open Whiteboard" to start.';
+                });
+
+                call.on('close', () => {
+                    statusEl.textContent = 'Student disconnected. Waiting...';
+                });
+            });
+
+            peer.on('error', (err) => {
+                console.error('Peer error:', err);
+                statusEl.textContent = 'Connection error. Refresh to retry.';
+            });
+        }
+
+        // Student: connect to tutor's peer
+        function setupStudent() {
+            peer = new Peer();
+
+            peer.on('open', (id) => {
+                statusEl.textContent = 'Connecting to tutor...';
+
+                // Call tutor
+                const call = peer.call(tutorPeerId, audioStream);
+                currentCall = call;
+
+                call.on('stream', (remoteStream) => {
+                    playAudio(remoteStream);
+                    statusEl.textContent = 'Connected! Click "Open Whiteboard" to start.';
+                });
+
+                call.on('close', () => {
+                    statusEl.textContent = 'Tutor disconnected. Refresh to retry.';
+                });
+
+                call.on('error', (err) => {
+                    console.error('Call error:', err);
+                    statusEl.textContent = 'Could not connect. Tutor may not be online.';
+                });
+            });
+
+            peer.on('error', (err) => {
+                console.error('Peer error:', err);
+                statusEl.textContent = 'Could not find tutor. They may not be in session.';
+            });
+        }
+
+        // Play remotely received audio
+        function playAudio(stream) {
+            const audio = document.createElement('audio');
+            audio.srcObject = stream;
+            audio.autoplay = true;
+            audio.playsInline = true;
+            audio.id = 'remoteAudio';
+        }
+
+        async function connectAudio() {
+            await initAudio();
+
+            if (isTutor) {
+                setupTutor();
+            } else {
+                setupStudent();
             }
         }
 
@@ -130,6 +206,9 @@
             if (confirm('End this session?')) {
                 if (audioStream) {
                     audioStream.getTracks().forEach(track => track.stop());
+                }
+                if (peer) {
+                    peer.destroy();
                 }
                 window.location.href = isTutor ? 'tutor_dashboard.html' : 'dashboard.html';
             }

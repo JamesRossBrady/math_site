@@ -79,6 +79,7 @@
         <input type="text" id="textInput" style="display:none; position:absolute; border:none; outline:none; font-size:16px; padding:4px; min-width:50px;" />
     </div>
     <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -102,7 +103,92 @@
         const urlParams = new URLSearchParams(window.location.search);
         const sessionDate = urlParams.get('date');
         const sessionHour = urlParams.get('hour');
+        const isTutor = urlParams.get('tutor') === 'true';
         const roomId = sessionDate + '-' + sessionHour;
+
+        // PeerJS for audio
+        let peer = null;
+        let audioStream = null;
+        let currentCall = null;
+        const tutorPeerId = 'session-' + sessionDate + '-' + sessionHour;
+
+        // Initialize mic and PeerJS audio
+        async function initAudio() {
+            try {
+                audioStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+            } catch (err) {
+                console.error('Mic error:', err);
+            }
+        }
+
+        function setupTutorAudio() {
+            peer = new Peer(tutorPeerId);
+
+            peer.on('open', () => {
+                console.log('Tutor audio ready');
+            });
+
+            peer.on('call', (call) => {
+                call.answer(audioStream);
+                currentCall = call;
+
+                call.on('stream', (remoteStream) => {
+                    playAudio(remoteStream);
+                });
+            });
+
+            peer.on('error', (err) => {
+                console.error('Peer error:', err);
+            });
+        }
+
+        function setupStudentAudio() {
+            peer = new Peer();
+
+            peer.on('open', () => {
+                const call = peer.call(tutorPeerId, audioStream);
+                currentCall = call;
+
+                call.on('stream', (remoteStream) => {
+                    playAudio(remoteStream);
+                });
+
+                call.on('error', (err) => {
+                    console.error('Call error:', err);
+                });
+            });
+
+            peer.on('error', (err) => {
+                console.error('Peer error:', err);
+            });
+        }
+
+        function playAudio(stream) {
+            // Only create audio element if not already present
+            if (!document.getElementById('remoteAudio')) {
+                const audio = document.createElement('audio');
+                audio.id = 'remoteAudio';
+                audio.srcObject = stream;
+                audio.autoplay = true;
+                audio.playsInline = true;
+            }
+        }
+
+        // Initialize audio on load
+        (async function() {
+            await initAudio();
+            if (isTutor) {
+                setupTutorAudio();
+            } else {
+                setupStudentAudio();
+            }
+        })();
 
         // Join the room for this session
         socket.emit('join-room', roomId);
