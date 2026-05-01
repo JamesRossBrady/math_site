@@ -379,18 +379,20 @@ app.post('/api/sessions/confirm', authenticateTutor, async (req, res) => {
                 [student_id]
             );
         } else if (user.stripe_customer_id && stripe && process.env.ENABLE_CHARGES === 'true') {
-            // Try Stripe charge
+            // Charge the customer's default payment method
             try {
                 const intent = await stripe.paymentIntents.create({
                     amount: 2500,
                     currency: 'usd',
-                    payment_method: user.stripe_customer_id,
+                    customer: user.stripe_customer_id,
+                    off_session: true,
+                    confirm: true,
                     description: 'Math session'
                 });
                 console.log('Stripe intent:', intent.id, 'status:', intent.status);
                 charged = true;
             } catch(e) {
-                console.error('Stripe:', e.message);
+                console.error('Stripe charge failed:', e.message);
                 await pool.query('UPDATE users SET free_sessions = free_sessions + 1 WHERE id = $1', [student_id]);
             }
         } else {
@@ -666,7 +668,7 @@ app.get('/api/user/:id', authenticateStudent, async (req, res) => {
             return res.status(403).json({ error: 'Access denied' });
         }
         const result = await pool.query(
-            'SELECT id, username, email, stripe_customer_id, free_sessions, created_at FROM users WHERE id = $1',
+            'SELECT id, username, email, free_sessions, created_at, CASE WHEN stripe_customer_id IS NOT NULL THEN true ELSE false END as has_payment_method FROM users WHERE id = $1',
             [id]
         );
         if (result.rows.length === 0) {
@@ -683,18 +685,44 @@ app.get('/api/user/:id', authenticateStudent, async (req, res) => {
 app.post('/api/user/payment-method', authenticateStudent, async (req, res) => {
     try {
         const { paymentMethodId } = req.body;
-        console.log('Saving payment for user:', req.user.id, 'pm:', paymentMethodId);
 
-        // Just save the payment method directly
+        if (!stripe) {
+            return res.status(500).json({ error: 'Stripe not configured' });
+        }
+
+        // Get user's current data
+        const userResult = await pool.query(
+            'SELECT id, email, stripe_customer_id FROM users WHERE id = $1',
+            [req.user.id]
+        );
+        const user = userResult.rows[0];
+
+        // Use existing Customer or create one
+        let customerId = user.stripe_customer_id;
+        if (!customerId || !customerId.startsWith('cus_')) {
+            const customer = await stripe.customers.create({ email: user.email });
+            customerId = customer.id;
+        }
+
+        // Attach payment method to the Customer
+        await stripe.paymentMethods.attach(paymentMethodId, { customer: customerId });
+
+        // Set as default payment method
+        await stripe.customers.update(customerId, {
+            invoice_settings: { default_payment_method: paymentMethodId }
+        });
+
+        // Store Customer ID
         await pool.query(
             'UPDATE users SET stripe_customer_id = $1 WHERE id = $2',
-            [paymentMethodId, req.user.id]
+            [customerId, req.user.id]
         );
 
+        console.log('Payment method saved for user:', req.user.id);
         res.json({ success: true });
     } catch (err) {
         console.error('Payment method error:', err);
-        res.status(500).json({ error: 'Database error' });
+        res.status(500).json({ error: 'Failed to save payment method' });
     }
 });
 
