@@ -104,10 +104,10 @@
                 console.log('Verify response:', data);
                 const message = document.getElementById('paymentMessage');
                 if (data.success) {
-                    message.textContent = 'Payment received! +1 session added. Go to calendar to book.';
+                    message.textContent = 'Payment verified! Your session credit will appear below.';
                     message.className = 'message success';
                 } else {
-                    message.textContent = data.error || 'Payment verification pending. Your session will be added shortly.';
+                    message.textContent = 'Payment pending. Your session will be added once processing completes.';
                     message.className = 'message info';
                 }
                 window.history.replaceState({}, document.title, window.location.pathname);

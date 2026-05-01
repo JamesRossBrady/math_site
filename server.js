@@ -395,9 +395,9 @@ app.post('/api/sessions/confirm', authenticateTutor, async (req, res) => {
                 console.error('Stripe charge failed:', e.message);
                 await pool.query('UPDATE users SET free_sessions = free_sessions + 1 WHERE id = $1', [student_id]);
             }
-        } else {
-            await pool.query('UPDATE users SET free_sessions = free_sessions + 1 WHERE id = $1', [student_id]);
         }
+        // If no credits and no payment method, just confirm without charging
+        // (tutor manually confirmed)
 
         // Mark as confirmed
         const result = await pool.query(
@@ -726,7 +726,7 @@ app.post('/api/user/payment-method', authenticateStudent, async (req, res) => {
     }
 });
 
-// Verify Stripe checkout session and grant session credit
+// Verify Stripe checkout session (credits granted by webhook, not here)
 app.post('/api/stripe/verify-session', authenticateStudent, async (req, res) => {
     try {
         const { sessionId } = req.body;
@@ -742,34 +742,13 @@ app.post('/api/stripe/verify-session', authenticateStudent, async (req, res) => 
         // Retrieve the checkout session from Stripe
         const session = await stripe.checkout.sessions.retrieve(sessionId);
 
-        if (session.payment_status !== 'paid') {
-            return res.status(400).json({ error: 'Payment not completed' });
+        if (session.payment_status === 'paid') {
+            res.json({ success: true, status: 'paid' });
+        } else if (session.payment_status === 'unpaid') {
+            res.json({ success: false, status: 'unpaid', error: 'Payment not yet completed' });
+        } else {
+            res.json({ success: false, status: session.payment_status });
         }
-
-        // Verify the customer email matches the authenticated user
-        const customerEmail = session.customer_details?.email || session.customer_email;
-        if (!customerEmail) {
-            return res.status(400).json({ error: 'No email on session' });
-        }
-
-        const userResult = await pool.query(
-            'SELECT id, email FROM users WHERE id = $1',
-            [req.user.id]
-        );
-
-        if (userResult.rows.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        // Grant 1 free session
-        const updated = await pool.query(
-            'UPDATE users SET free_sessions = free_sessions + 1 WHERE id = $1 RETURNING free_sessions',
-            [req.user.id]
-        );
-
-        io.to('calendar').emit('credits-updated', { userId: req.user.id, freeSessions: updated.rows[0].free_sessions });
-
-        res.json({ success: true, freeSessions: updated.rows[0].free_sessions });
     } catch (err) {
         console.error('Verify session error:', err);
         res.status(500).json({ error: 'Failed to verify payment' });
