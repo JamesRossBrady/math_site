@@ -166,7 +166,6 @@
             color: #c62828;
         }
     </style>
-    <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
     <div class="header">
@@ -213,13 +212,9 @@
 
             <br>
 
-            <div class="form-group">
-                <label>Add or Update Card</label>
-                <div id="card-element"></div>
-            </div>
-
-            <button class="btn btn-primary" id="saveCardBtn" onclick="savePaymentMethod()">Save Card</button>
-            <a href="dashboard.html" class="btn" style="background:#666;color:white;text-decoration:none;padding:12px 24px;border-radius:5px;">Back to Calendar</a>
+            <a href="https://buy.stripe.com/dRmeVc3Ik1Kw1GU8Oo2kw00" target="_blank" class="btn btn-primary" style="display:inline-block;text-decoration:none;text-align:center;">Add Payment Method</a>
+            <a href="dashboard.html" class="btn" style="background:#666;color:white;text-decoration:none;padding:12px 24px;border-radius:5px;margin-left:10px;">Back to Calendar</a>
+            <p style="margin-top:10px;font-size:14px;color:#666;">Click to open Stripe secure checkout</p>
         </div>
     </div>
 
@@ -232,34 +227,57 @@
         document.getElementById('username').textContent = user.username;
         document.getElementById('email').textContent = user.email;
 
+        // Check for Stripe redirect with session_id
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session_id');
+
+        if (sessionId) {
+            verifyStripeSession(sessionId);
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
         // Check payment status
         checkPaymentStatus();
 
-        // Initialize Stripe
-        console.log('Stripe object:', typeof Stripe);
-        console.log('js.stripe.com loaded:', typeof window.Stripe !== 'undefined');
+        async function verifyStripeSession(sessionId) {
+            const message = document.getElementById('paymentMessage');
+            message.textContent = 'Verifying payment...';
+            message.className = 'message';
 
-        if (typeof Stripe === 'undefined') {
-            console.error('Stripe.js did not load!');
-            document.getElementById('paymentMessage').textContent = 'Stripe failed to load. Check your internet connection.';
-            document.getElementById('paymentMessage').className = 'message error';
-        }
+            try {
+                const response = await fetch('/api/stripe/verify-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId })
+                });
 
-        const stripe = Stripe('pk_live_51TQsYgAoZCeoX20P4eL4bGqN7XTGysrbE6ne9jjnZqEXp2So9exxgVB2Z3vQ06CHRVE6NYRxMF2kiUrHa72eNLfz00uiv3rONw');
-        const elements = stripe.elements();
-        const card = elements.create('card', {
-            style: {
-                base: {
-                    fontSize: '16px'
+                const data = await response.json();
+
+                if (response.ok && data.paymentMethodId) {
+                    // Save the payment method to user
+                    await fetch('/api/user/payment-method', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            userId: user.id,
+                            paymentMethodId: data.paymentMethodId
+                        })
+                    });
+
+                    message.textContent = 'Payment successful! Payment method saved.';
+                    message.className = 'message success';
+                } else {
+                    message.textContent = data.error || 'Payment verification failed';
+                    message.className = 'message error';
                 }
+            } catch (err) {
+                message.textContent = 'Error verifying payment';
+                message.className = 'message error';
             }
-        });
 
-        setTimeout(() => {
-            console.log('Mounting card...');
-            card.mount('#card-element');
-            console.log('Mounted');
-        }, 100);
+            checkPaymentStatus();
+        }
 
         async function checkPaymentStatus() {
             try {
@@ -277,56 +295,6 @@
             } catch (err) {
                 console.error('Error checking payment status:', err);
             }
-        }
-
-        async function savePaymentMethod() {
-            const btn = document.getElementById('saveCardBtn');
-            const message = document.getElementById('paymentMessage');
-            btn.disabled = true;
-            btn.textContent = 'Saving...';
-
-            try {
-                const { paymentMethod, error } = await stripe.createPaymentMethod({
-                    type: 'card',
-                    card: card,
-                    billing_details: { email: user.email }
-                });
-
-                if (error) {
-                    message.textContent = error.message;
-                    message.className = 'message error';
-                    btn.disabled = false;
-                    btn.textContent = 'Save Card';
-                    return;
-                }
-
-                // Send to server
-                const response = await fetch('/api/user/payment-method', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        userId: user.id,
-                        paymentMethodId: paymentMethod.id
-                    })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    message.textContent = 'Payment method saved successfully!';
-                    message.className = 'message success';
-                    checkPaymentStatus();
-                } else {
-                    message.textContent = data.error || 'Failed to save payment method';
-                    message.className = 'message error';
-                }
-            } catch (err) {
-                message.textContent = 'Connection error. Please try again.';
-                message.className = 'message error';
-            }
-
-            btn.disabled = false;
-            btn.textContent = 'Save Card';
         }
 
         function logout() {

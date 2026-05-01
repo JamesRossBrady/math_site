@@ -515,6 +515,33 @@ app.post('/api/user/payment-method', async (req, res) => {
     }
 });
 
+// Verify Stripe checkout session and get payment method
+app.post('/api/stripe/verify-session', async (req, res) => {
+    try {
+        const { sessionId } = req.body;
+
+        if (!stripe) {
+            return res.status(500).json({ error: 'Stripe not configured' });
+        }
+
+        // Retrieve the checkout session
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+        if (session.payment_status === 'paid') {
+            // Get the payment method
+            const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent);
+            const paymentMethodId = paymentIntent.payment_method;
+
+            res.json({ success: true, paymentMethodId });
+        } else {
+            res.status(400).json({ error: 'Payment not completed' });
+        }
+    } catch (err) {
+        console.error('Verify session error:', err);
+        res.status(500).json({ error: 'Invalid session' });
+    }
+});
+
 // Tutor login API
 app.post('/api/tutor/login', (req, res) => {
     const { password } = req.body;
