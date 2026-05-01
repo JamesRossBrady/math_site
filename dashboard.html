@@ -419,17 +419,6 @@
             refreshTimeout = setTimeout(() => {
                 generateCalendar(currentWeekOffset);
                 loadCredits();
-                // Show notification after calendar updates
-                if (session) {
-                    const hour = session.slot_hour;
-                    const ampm = hour >= 12 ? 'PM' : 'AM';
-                    const displayHour = hour > 12 ? hour - 12 : hour;
-                    if (session.status === 'confirmed') {
-                        alert('Your session for ' + displayHour + ':00 ' + ampm + ' on ' + session.slot_date + ' has been confirmed!');
-                    } else if (session.status === 'available') {
-                        alert('Your session on ' + session.slot_date + ' at ' + displayHour + ':00 ' + ampm + ' has been canceled by James.');
-                    }
-                }
             }, 100);
         });
 
