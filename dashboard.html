@@ -563,10 +563,10 @@
                     } else if (session) {
                         if (session.status === 'confirmed') {
                             slot.className = 'time-slot confirmed';
-                            slot.innerHTML = '<div style="text-align:center;line-height:1.2;"><div>Confirmed</div><span style="font-size:9px;">' + (session.student_name || '') + '</span></div>';
+                            slot.innerHTML = '<div style="text-align:center;line-height:1.2;"><div>Confirmed</div><span style="font-size:9px;">' + escapeHTML(session.student_name) + '</span></div>';
                         } else if (session.status === 'pending') {
                             slot.className = 'time-slot pending';
-                            slot.innerHTML = '<div style="text-align:center;line-height:1.2;"><div>Pending</div><span style="font-size:9px;">' + (session.student_name || '') + '</span></div>';
+                            slot.innerHTML = '<div style="text-align:center;line-height:1.2;"><div>Pending</div><span style="font-size:9px;">' + escapeHTML(session.student_name) + '</span></div>';
                         } else if (session.status === 'unavailable') {
                             slot.className = 'time-slot unavailable';
                             slot.textContent = 'Unavailable';
@@ -701,6 +701,11 @@
 
         let currentWeekOffset = 0;
         let currentSessions = []; // Store sessions for bookSlot access
+        function escapeHTML(str) {
+            const div = document.createElement('div');
+            div.textContent = str || '';
+            return div.innerHTML;
+        }
         function logout() {
             sessionStorage.removeItem('user');
             sessionStorage.removeItem('token');

@@ -118,7 +118,7 @@
         let currentCall = null;
         let studentRetries = 0;
         const MAX_RETRIES = 10;
-        const tutorPeerId = 'session-' + sessionDate + '-' + sessionHour;
+        let tutorPeerId = null;
         const statusEl = document.getElementById('audioStatus');
 
         function setAudioStatus(text, cls) {
@@ -297,6 +297,11 @@
         // Initialize audio on load with a delay to let old peer disconnect
         (async function() {
             await initAudio();
+
+            // Fetch secure peer ID from server
+            const res = await fetch('/api/sessions/peer-id?slot_date=' + sessionDate + '&slot_hour=' + sessionHour);
+            const data = await res.json();
+            tutorPeerId = data.peerId;
 
             // Small delay to let previous peer (from video.html) fully disconnect
             await new Promise(r => setTimeout(r, 500));

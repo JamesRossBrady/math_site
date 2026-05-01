@@ -98,9 +98,14 @@
         let peer = null;
         let audioStream = null;
         let currentCall = null;
+        let tutorPeerId = null;
 
-        // Tutor peer ID format: "session-{date}-{hour}"
-        const tutorPeerId = 'session-' + sessionDate + '-' + sessionHour;
+        // Fetch secure peer ID from server
+        async function fetchPeerId() {
+            const res = await fetch('/api/sessions/peer-id?slot_date=' + sessionDate + '&slot_hour=' + sessionHour);
+            const data = await res.json();
+            tutorPeerId = data.peerId;
+        }
 
         // Initialize audio
         async function initAudio() {
@@ -206,6 +211,7 @@
 
         async function connectAudio() {
             await initAudio();
+            await fetchPeerId();
 
             if (isTutor) {
                 setupTutor();

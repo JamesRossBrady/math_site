@@ -7,6 +7,8 @@ const { Server } = require('socket.io');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 // Stripe - only initialize if API key is provided
 let stripe = null;
 if (process.env.STRIPE_API_KEY) {
@@ -25,7 +27,25 @@ const io = new Server(server, {
     }
 });
 
+app.use(helmet({ contentSecurityPolicy: false })); // CSP disabled for inline scripts
 app.use(cors());
+
+// Rate limiters
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20, // 20 attempts per window
+    message: { error: 'Too many attempts. Please try again later.' }
+});
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    message: { error: 'Too many requests. Please try again later.' }
+});
+
+// Apply rate limiting to auth endpoints
+app.use('/api/login', authLimiter);
+app.use('/api/signup', authLimiter);
+app.use('/api/tutor/login', authLimiter);
 
 // Stripe webhook - must be BEFORE express.json() to get raw body
 app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (req, res) => {
@@ -112,6 +132,16 @@ function authenticateTutor(req, res, next) {
     }
 }
 
+// Generate a secure, non-guessable peer ID for a session
+app.get('/api/sessions/peer-id', (req, res) => {
+    const { slot_date, slot_hour } = req.query;
+    if (!slot_date || !slot_hour) {
+        return res.status(400).json({ error: 'slot_date and slot_hour required' });
+    }
+    const hash = crypto.createHash('sha256').update(JWT_SECRET + slot_date + '-' + slot_hour).digest('hex').substring(0, 16);
+    res.json({ peerId: 'session-' + hash });
+});
+
 // Hardcoded tutor password (stored hashed with salt on server)
 const TUTOR_SALT = 'math_site_salt_2024';
 const TUTOR_PASSWORD_HASH = '74bbb24a35914189f3532865e01f23d2d1259c53b646ab96a350534b32c6d9d7'; // SHA-256(salt + new password)
@@ -128,8 +158,12 @@ const pool = new Pool({
     port: process.env.DB_PORT || 5432,
     database: process.env.DB_NAME || 'math_site',
     user: process.env.DB_USER || 'jamesrossbrady',
-    password: process.env.DB_PASSWORD || 'password'
+    password: process.env.DB_PASSWORD
 });
+if (!process.env.DATABASE_URL && !process.env.DB_PASSWORD) {
+    console.error('DB_PASSWORD or DATABASE_URL must be set');
+    process.exit(1);
+}
 
 // Initialize database tables
 async function initDB() {
@@ -237,31 +271,33 @@ app.get('/api/sessions', async (req, res) => {
 
 // Book a session (student uses their available session)
 app.post('/api/sessions/book', authenticateStudent, async (req, res) => {
+    const { slot_date, slot_hour, subject, textbook, chapter, struggling } = req.body;
+    const parsedDate = String(slot_date);
+    const parsedHour = parseInt(slot_hour);
+    const parsedUserId = req.user.id;
+
+    const client = await pool.connect();
     try {
-        const { slot_date, slot_hour, subject, textbook, chapter, struggling } = req.body;
+        await client.query('BEGIN');
 
-        const parsedDate = String(slot_date);
-        const parsedHour = parseInt(slot_hour);
-        const parsedUserId = req.user.id;
-
-        // Check user has at least 1 available session
-        const userResult = await pool.query(
-            'SELECT free_sessions FROM users WHERE id = $1',
+        // Lock the user row to prevent concurrent bookings
+        const userResult = await client.query(
+            'SELECT free_sessions FROM users WHERE id = $1 FOR UPDATE',
             [parsedUserId]
         );
 
         if (userResult.rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(400).json({ error: 'User not found' });
         }
 
-        const user = userResult.rows[0];
-
-        if (user.free_sessions < 1) {
+        if (userResult.rows[0].free_sessions < 1) {
+            await client.query('ROLLBACK');
             return res.status(400).json({ error: 'No sessions left. Buy more in settings.' });
         }
 
-        // Book directly as confirmed (no tutor confirmation needed)
-        const result = await pool.query(
+        // Book directly as confirmed
+        const result = await client.query(
             `UPDATE sessions
              SET status = 'confirmed', student_id = $7, subject = $3, textbook = $4, chapter = $5, struggling = $6, paid = TRUE, updated_at = CURRENT_TIMESTAMP
              WHERE slot_date = $1 AND slot_hour = $2 AND status = 'available'
@@ -270,31 +306,28 @@ app.post('/api/sessions/book', authenticateStudent, async (req, res) => {
         );
 
         if (result.rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(400).json({ error: 'Slot not available' });
         }
 
-        // Deduct one session from user's available sessions
-        await pool.query(
-            'UPDATE users SET free_sessions = free_sessions - 1 WHERE id = $1',
+        // Deduct one session atomically within the transaction
+        const updatedUser = await client.query(
+            'UPDATE users SET free_sessions = free_sessions - 1 WHERE id = $1 RETURNING free_sessions',
             [parsedUserId]
         );
 
-        // Get updated free_sessions
-        const updatedUser = await pool.query(
-            'SELECT free_sessions FROM users WHERE id = $1',
-            [parsedUserId]
-        );
+        await client.query('COMMIT');
 
-        // Notify all calendars
         io.to('calendar').emit('session-updated', result.rows[0]);
-
-        // Notify the student their credits were updated
         io.to('calendar').emit('credits-updated', { userId: parsedUserId, freeSessions: updatedUser.rows[0].free_sessions });
 
         res.json(result.rows[0]);
     } catch (err) {
+        await client.query('ROLLBACK');
         console.error(err);
         res.status(500).json({ error: 'Database error' });
+    } finally {
+        client.release();
     }
 });
 
@@ -335,7 +368,7 @@ app.post('/api/sessions/confirm', authenticateTutor, async (req, res) => {
         const user = userResult.rows[0];
         let charged = false;
 
-        console.log('Confirm check - free_sessions:', user.free_sessions, 'stripe_customer_id:', user.stripe_customer_id, 'stripe:', !!stripe, 'ENABLE_CHARGES:', process.env.ENABLE_CHARGES);
+        console.log('Confirm check - free_sessions:', user.free_sessions, 'has_payment:', !!user.stripe_customer_id, 'stripe_configured:', !!stripe);
 
         // Check if student already used a free session (paid=true means they had credit)
         if (alreadyPaid) {
@@ -349,7 +382,7 @@ app.post('/api/sessions/confirm', authenticateTutor, async (req, res) => {
             // Try Stripe charge
             try {
                 const intent = await stripe.paymentIntents.create({
-                    amount: 50,
+                    amount: 2500,
                     currency: 'usd',
                     payment_method: user.stripe_customer_id,
                     description: 'Math session'
@@ -565,7 +598,7 @@ app.delete('/api/users/:id', authenticateTutor, async (req, res) => {
     } catch (err) {
         await client.query('ROLLBACK');
         console.error('Delete user error:', err);
-        res.status(500).json({ error: 'Database error: ' + err.message });
+        res.status(500).json({ error: 'Database error' });
     } finally {
         client.release();
     }
@@ -665,8 +698,8 @@ app.post('/api/user/payment-method', authenticateStudent, async (req, res) => {
     }
 });
 
-// Verify Stripe checkout session and get payment method
-app.post('/api/stripe/verify-session', async (req, res) => {
+// Verify Stripe checkout session and grant session credit
+app.post('/api/stripe/verify-session', authenticateStudent, async (req, res) => {
     try {
         const { sessionId } = req.body;
 
@@ -674,21 +707,44 @@ app.post('/api/stripe/verify-session', async (req, res) => {
             return res.status(500).json({ error: 'Stripe not configured' });
         }
 
-        // Retrieve the checkout session
+        if (!sessionId) {
+            return res.status(400).json({ error: 'Session ID required' });
+        }
+
+        // Retrieve the checkout session from Stripe
         const session = await stripe.checkout.sessions.retrieve(sessionId);
 
-        if (session.payment_status === 'paid') {
-            // Get the payment method
-            const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent);
-            const paymentMethodId = paymentIntent.payment_method;
-
-            res.json({ success: true, paymentMethodId });
-        } else {
-            res.status(400).json({ error: 'Payment not completed' });
+        if (session.payment_status !== 'paid') {
+            return res.status(400).json({ error: 'Payment not completed' });
         }
+
+        // Verify the customer email matches the authenticated user
+        const customerEmail = session.customer_details?.email || session.customer_email;
+        if (!customerEmail) {
+            return res.status(400).json({ error: 'No email on session' });
+        }
+
+        const userResult = await pool.query(
+            'SELECT id, email FROM users WHERE id = $1',
+            [req.user.id]
+        );
+
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Grant 1 free session
+        const updated = await pool.query(
+            'UPDATE users SET free_sessions = free_sessions + 1 WHERE id = $1 RETURNING free_sessions',
+            [req.user.id]
+        );
+
+        io.to('calendar').emit('credits-updated', { userId: req.user.id, freeSessions: updated.rows[0].free_sessions });
+
+        res.json({ success: true, freeSessions: updated.rows[0].free_sessions });
     } catch (err) {
         console.error('Verify session error:', err);
-        res.status(500).json({ error: 'Invalid session' });
+        res.status(500).json({ error: 'Failed to verify payment' });
     }
 });
 
@@ -725,6 +781,20 @@ app.post('/api/tutor/login', (req, res) => {
 app.post('/api/signup', async (req, res) => {
     try {
         const { username, email, password } = req.body;
+
+        // Validate input
+        if (!username || !email || !password) {
+            return res.status(400).json({ error: 'All fields are required' });
+        }
+        if (typeof username !== 'string' || username.trim().length < 2 || username.length > 50) {
+            return res.status(400).json({ error: 'Username must be 2-50 characters' });
+        }
+        if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return res.status(400).json({ error: 'Invalid email address' });
+        }
+        if (typeof password !== 'string' || password.length < 6) {
+            return res.status(400).json({ error: 'Password must be at least 6 characters' });
+        }
 
         // Check if username or email already exists
         const existing = await pool.query(

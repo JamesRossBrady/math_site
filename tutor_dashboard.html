@@ -673,11 +673,11 @@
                         slot.dataset.status = 'too-far';
                     } else if (session && session.status === 'confirmed') {
                         slot.className = 'time-slot confirmed';
-                        slot.innerHTML = '<div style="text-align:center;line-height:1.2;"><div>Confirmed</div><span style="font-size:9px;">' + (session.student_name || 'Student') + '</span></div>';
+                        slot.innerHTML = '<div style="text-align:center;line-height:1.2;"><div>Confirmed</div><span style="font-size:9px;">' + escapeHTML(session.student_name || 'Student') + '</span></div>';
                         slot.dataset.studentName = session.student_name || '';
                     } else if (session && session.status === 'pending') {
                         slot.className = 'time-slot pending';
-                        slot.innerHTML = '<div style="text-align:center;line-height:1.2;"><div>Pending</div><span style="font-size:9px;">' + (session.student_name || 'Student') + '</span></div>';
+                        slot.innerHTML = '<div style="text-align:center;line-height:1.2;"><div>Pending</div><span style="font-size:9px;">' + escapeHTML(session.student_name || 'Student') + '</span></div>';
                         slot.dataset.studentName = session.student_name || '';
                     } else if (session && session.status === 'unavailable') {
                         slot.className = 'time-slot unavailable';
@@ -923,15 +923,19 @@
                     const date = new Date(user.created_at).toLocaleDateString();
                     const freeSessions = user.free_sessions || 0;
                     li.innerHTML = `
-                        <div class="name">${user.username}</div>
-                        <div class="email">${user.email}</div>
+                        <div class="name"></div>
+                        <div class="email"></div>
                         <div class="date">Joined: ${date}</div>
                         <div class="free-sessions">
-                            <button class="free-sessions-btn add" onclick="updateFreeSessions(${user.id}, 1)" title="Add 1 session">+</button>
+                            <button class="free-sessions-btn add" id="add-btn-${user.id}" title="Add 1 session">+</button>
                             <span class="free-sessions-count">${freeSessions} available</span>
                         </div>
-                        <button class="delete-user-btn" onclick="deleteUser(${user.id}, '${user.username}')" title="Delete user">Delete</button>
+                        <button class="delete-user-btn" id="delete-btn-${user.id}" title="Delete user">Delete</button>
                     `;
+                    li.querySelector('.name').textContent = user.username;
+                    li.querySelector('.email').textContent = user.email;
+                    li.querySelector('#add-btn-' + user.id).onclick = function() { updateFreeSessions(user.id, 1); };
+                    li.querySelector('#delete-btn-' + user.id).onclick = function() { deleteUser(user.id, user.username); };
                     list.appendChild(li);
                 });
             } catch (err) {

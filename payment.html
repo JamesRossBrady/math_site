@@ -87,31 +87,33 @@
         const setupIntent = urlParams.get('setup_intent');
         const redirectStatus = urlParams.get('redirect_status');
 
-        console.log('All URL params:', Object.fromEntries(urlParams));
-        console.log('Session ID:', sessionId);
-        console.log('Payment Intent:', paymentIntent);
-        console.log('Setup Intent:', setupIntent);
-        console.log('Redirect Status:', redirectStatus);
+        // Log only that we're processing, not the sensitive params
 
         if (sessionId || paymentIntent || (redirectStatus === 'success')) {
             console.log('Processing payment return...');
-            // Add 1 session for the payment they just made
-            fetch('/api/user/free-sessions', {
+            // Verify payment with Stripe server-side and grant session
+            const verifyBody = sessionId ? { sessionId } : {};
+            fetch('/api/stripe/verify-session', {
                 method: 'POST',
                 headers: authHeaders(),
-                body: JSON.stringify({ amount: 1 })
+                body: JSON.stringify(verifyBody)
             }).then(res => {
                 console.log('Response status:', res.status);
                 return res.json();
             }).then(data => {
-                console.log('Session added response:', data);
+                console.log('Verify response:', data);
                 const message = document.getElementById('paymentMessage');
-                message.textContent = 'Payment received! +1 session added. Go to calendar to book.';
-                message.className = 'message success';
+                if (data.success) {
+                    message.textContent = 'Payment received! +1 session added. Go to calendar to book.';
+                    message.className = 'message success';
+                } else {
+                    message.textContent = data.error || 'Payment verification pending. Your session will be added shortly.';
+                    message.className = 'message info';
+                }
                 window.history.replaceState({}, document.title, window.location.pathname);
                 loadCredits();
             }).catch(err => {
-                console.error('Error adding session:', err);
+                console.error('Error verifying payment:', err);
             });
         } else {
             console.log('No payment parameters found in URL');
