@@ -419,14 +419,10 @@
         const socket = io();
         socket.emit('join-calendar');
 
-        // Listen for session updates (debounced)
-        let refreshTimeout = null;
+        // Listen for session updates (instant)
         socket.on('session-updated', (session) => {
-            clearTimeout(refreshTimeout);
-            refreshTimeout = setTimeout(() => {
-                generateCalendar(currentWeekOffset);
-                loadCredits();
-            }, 100);
+            generateCalendar(currentWeekOffset);
+            loadCredits();
         });
 
         // Listen for user deletion (kicked by tutor)
@@ -707,10 +703,10 @@
 
         generateCalendar(0);
 
-        // Auto-refresh calendar every hour to update past slots
+        // Backup: refresh every 30 seconds in case socket misses update
         setInterval(() => {
             generateCalendar(currentWeekOffset);
-        }, 3600000);
+        }, 30000);
     </script>
 </body>
 </html>
