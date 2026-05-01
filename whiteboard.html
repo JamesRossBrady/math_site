@@ -144,57 +144,73 @@
         }
 
         function setupTutorAudio() {
+            console.log('[Audio] Tutor setting up peer:', tutorPeerId);
             peer = new Peer(tutorPeerId);
 
-            peer.on('open', () => {
+            peer.on('open', (id) => {
+                console.log('[Audio] Tutor peer open, ID:', id);
                 setAudioStatus('Waiting for student...');
             });
 
             peer.on('call', (call) => {
+                console.log('[Audio] Tutor received call from:', call.peer);
                 call.answer(audioStream);  // audioStream may be null if no mic
                 currentCall = call;
                 setAudioStatus(audioStream ? 'Student connected!' : 'Student connected (no mic)');
 
                 call.on('stream', (remoteStream) => {
+                    console.log('[Audio] Tutor got remote stream');
                     playAudio(remoteStream);
                     setAudioStatus('Connected', 'connected');
                 });
 
                 call.on('close', () => {
+                    console.log('[Audio] Tutor call closed');
                     setAudioStatus('Student disconnected');
                 });
 
                 call.on('error', (err) => {
-                    console.error('Call error:', err);
+                    console.error('[Audio] Tutor call error:', err);
                     setAudioStatus('Call error', 'error');
                 });
             });
 
             peer.on('error', (err) => {
-                console.error('Peer error:', err);
-                setAudioStatus('Connection error', 'error');
+                console.error('[Audio] Tutor peer error:', err.type, err);
+                if (err.type === 'unavailable-id') {
+                    // ID still in use, retry with a delay
+                    setAudioStatus('ID in use, retrying...');
+                    peer.destroy();
+                    setTimeout(() => setupTutorAudio(), 1000);
+                } else {
+                    setAudioStatus('Connection error: ' + err.type, 'error');
+                }
             });
 
             peer.on('disconnected', () => {
+                console.log('[Audio] Tutor peer disconnected, reconnecting...');
                 setAudioStatus('Reconnecting...');
                 peer.reconnect();
             });
         }
 
         function setupStudentAudio() {
+            console.log('[Audio] Student setting up peer');
             peer = new Peer();
 
-            peer.on('open', () => {
+            peer.on('open', (id) => {
+                console.log('[Audio] Student peer open, ID:', id);
                 setAudioStatus(audioStream ? 'Calling tutor...' : 'Connecting (no mic)...');
                 attemptCall();
             });
 
             peer.on('error', (err) => {
-                console.error('Peer error:', err);
-                setAudioStatus('Connection error', 'error');
+                console.error('[Audio] Student peer error:', err.type, err);
+                setAudioStatus('Connection error: ' + err.type, 'error');
             });
 
             peer.on('disconnected', () => {
+                console.log('[Audio] Student peer disconnected, reconnecting...');
                 setAudioStatus('Reconnecting...');
                 peer.reconnect();
             });
@@ -207,29 +223,45 @@
             }
             studentRetries++;
             setAudioStatus('Calling tutor... (' + studentRetries + '/' + MAX_RETRIES + ')');
+            console.log('[Audio] Student attempting call to:', tutorPeerId, 'attempt', studentRetries);
 
-            const call = peer.call(tutorPeerId, audioStream);
-            currentCall = call;
+            try {
+                const call = peer.call(tutorPeerId, audioStream);
+                currentCall = call;
+                console.log('[Audio] Student call object created');
 
-            call.on('stream', (remoteStream) => {
-                playAudio(remoteStream);
-                setAudioStatus(audioStream ? 'Connected' : 'Connected (no mic, listen only)', 'connected');
-                studentRetries = 0;
-            });
+                call.on('stream', (remoteStream) => {
+                    console.log('[Audio] Student got remote stream');
+                    playAudio(remoteStream);
+                    setAudioStatus(audioStream ? 'Connected' : 'Connected (no mic, listen only)', 'connected');
+                    studentRetries = 0;
+                });
 
-            call.on('close', () => {
-                setAudioStatus('Tutor disconnected');
-            });
+                call.on('close', () => {
+                    console.log('[Audio] Student call closed');
+                    setAudioStatus('Tutor disconnected');
+                });
 
-            call.on('error', (err) => {
-                console.error('Call error:', err);
+                call.on('error', (err) => {
+                    console.error('[Audio] Student call error:', err.type, err);
+                    currentCall = null;
+                    if (studentRetries < MAX_RETRIES) {
+                        setAudioStatus('Tutor not available, retrying in 2s...');
+                        setTimeout(() => attemptCall(), 2000);
+                    } else {
+                        setAudioStatus('Could not reach tutor. Refresh to retry.', 'error');
+                    }
+                });
+            } catch (err) {
+                console.error('[Audio] Student call threw:', err);
+                currentCall = null;
                 if (studentRetries < MAX_RETRIES) {
                     setAudioStatus('Tutor not available, retrying in 2s...');
                     setTimeout(() => attemptCall(), 2000);
                 } else {
                     setAudioStatus('Could not reach tutor. Refresh to retry.', 'error');
                 }
-            });
+            }
         }
 
         function updateVolume() {
