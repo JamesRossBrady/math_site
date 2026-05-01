@@ -104,14 +104,15 @@
         // Check initial payment status
         checkPaymentStatus();
 
-        // Initialize Stripe
+        // Initialize Stripe - keep reference globally
+        let stripe, card;
         if (typeof Stripe === 'undefined') {
             document.getElementById('paymentMessage').textContent = 'Stripe failed to load.';
             document.getElementById('paymentMessage').className = 'message error';
         } else {
-            const stripe = Stripe('pk_live_51TQsYgAoZCeoX20P4eL4bGqN7XTGysrbE6ne9jjnZqEXp2So9exxgVB2Z3vQ06CHRVE6NYRxMF2kiUrHa72eNLfz00uiv3rONw');
+            stripe = Stripe('pk_live_51TQsYgAoZCeoX20P4eL4bGqN7XTGysrbE6ne9jjnZqEXp2So9exxgVB2Z3vQ06CHRVE6NYRxMF2kiUrHa72eNLfz00uiv3rONw');
             const elements = stripe.elements();
-            const card = elements.create('card', { style: { base: { fontSize: '16px' } } });
+            card = elements.create('card', { style: { base: { fontSize: '16px' } } });
             setTimeout(() => card.mount('#card-element'), 100);
         }
 
@@ -121,15 +122,15 @@
             btn.disabled = true;
             btn.textContent = 'Saving...';
 
+            if (!stripe || !card) {
+                message.textContent = 'Stripe not loaded. Refresh and try again.';
+                message.className = 'message error';
+                btn.disabled = false;
+                btn.textContent = 'Save Card';
+                return;
+            }
+
             try {
-                // We need to re-fetch the card element since it's mounted
-                const stripe = Stripe('pk_live_51TQsYgAoZCeoX20P4eL4bGqN7XTGysrbE6ne9jjnZqEXp2So9exxgVB2Z3vQ06CHRVE6NYRxMF2kiUrHa72eNLfz00uiv3rONw');
-                const elements = stripe.elements();
-                const card = elements.create('card', { style: { base: { fontSize: '16px' } } });
-                card.mount('#card-element');
-
-                await new Promise(r => setTimeout(r, 200));
-
                 const { paymentMethod, error } = await stripe.createPaymentMethod({
                     type: 'card',
                     card: card,
