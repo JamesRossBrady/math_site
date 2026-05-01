@@ -24,6 +24,51 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '.')));
 
+// Stripe webhook for payment confirmation
+app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    let event;
+
+    try {
+        event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    } catch (err) {
+        console.error('Webhook signature verification failed:', err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle successful payment
+    if (event.type === 'checkout.session.completed') {
+        const session = event.data.object;
+        console.log('Payment completed:', session.id);
+
+        // Get the customer email from the session
+        const customerEmail = session.customer_details?.email || session.customer_email;
+
+        if (customerEmail) {
+            // Find the user by email and add 1 session
+            const userResult = await pool.query(
+                'SELECT id FROM users WHERE email = $1',
+                [customerEmail]
+            );
+
+            if (userResult.rows.length > 0) {
+                const userId = userResult.rows[0].id;
+                await pool.query(
+                    'UPDATE users SET free_sessions = free_sessions + 1 WHERE id = $1',
+                    [userId]
+                );
+
+                // Notify the student
+                io.to('calendar').emit('credits-updated', { userId: userId, freeSessions: userResult.rows[0].free_sessions + 1 });
+
+                console.log('Added 1 session to user:', customerEmail);
+            }
+        }
+    }
+
+    res.json({received: true});
+});
+
 // Hardcoded tutor password (stored hashed with salt on server)
 const TUTOR_SALT = 'math_site_salt_2024';
 const TUTOR_PASSWORD_HASH = '703e110ea4de4bba15675565beb04f172abc91d2a885b38257dec10cfe5f8d33'; // SHA-256(salt + 'aladan64SOFT12v?')
