@@ -374,6 +374,17 @@
         </div>
     </div>
 
+    <!-- No Sessions Modal -->
+    <div class="modal" id="noSessionsModal">
+        <div class="modal-content" style="text-align:center;">
+            <h3>Learn Math with James</h3>
+            <p style="font-size:16px;margin:20px 0;">No sessions left.<br>Buy more sessions in payment.</p>
+            <div class="modal-buttons">
+                <button type="button" class="btn-confirm" onclick="window.location.href='payment.html'">OK</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
     <script>
         // Check if user is logged in
@@ -617,7 +628,7 @@
 
                 // If they have at least 1 session, they can book
                 if (data.free_sessions < 1) {
-                    alert('No sessions left. Buy more sessions in settings.');
+                    document.getElementById('noSessionsModal').classList.add('active');
                     window.location.href = 'payment.html';
                     return;
                 }
