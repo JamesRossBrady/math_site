@@ -214,7 +214,20 @@
         }
 
         function goWhiteboard() {
-            window.location.href = 'whiteboard.html?date=' + sessionDate + '&hour=' + sessionHour + '&tutor=' + isTutor;
+            // Stop local audio tracks before navigating (keeps mic for whiteboard page)
+            // Destroy peer so PeerJS server frees the ID, then navigate
+            if (currentCall) {
+                currentCall.close();
+                currentCall = null;
+            }
+            if (peer) {
+                peer.destroy();
+                peer = null;
+            }
+            // Small delay to let PeerJS server process the disconnect before navigating
+            setTimeout(() => {
+                window.location.href = 'whiteboard.html?date=' + sessionDate + '&hour=' + sessionHour + '&tutor=' + isTutor;
+            }, 300);
         }
 
         function endSession() {
@@ -228,6 +241,21 @@
                 window.location.href = isTutor ? 'tutor_dashboard.html' : 'dashboard.html';
             }
         }
+
+        // Clean up peer when leaving the page
+        window.addEventListener('beforeunload', () => {
+            if (currentCall) {
+                currentCall.close();
+                currentCall = null;
+            }
+            if (peer) {
+                peer.destroy();
+                peer = null;
+            }
+            if (audioStream) {
+                audioStream.getTracks().forEach(t => t.stop());
+            }
+        });
 
         connectAudio();
     </script>

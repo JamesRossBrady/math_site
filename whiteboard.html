@@ -19,6 +19,10 @@
         canvas { background: white; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); cursor: crosshair; }
         .back { color: #666; text-decoration: none; padding: 10px 20px; border: 1px solid #ddd; border-radius: 5px; }
         .back:hover { background: #f5f5f5; }
+        .audio-status { font-size: 12px; color: #999; padding: 4px 10px; border-radius: 4px; background: #f0f0f0; }
+        .audio-status.connected { color: #4CAF50; background: #e8f5e9; }
+        .audio-status.error { color: #f44336; background: #ffebee; }
+        .volume-slider { width: 80px; margin-left: 4px; vertical-align: middle; }
         .time-info { display: flex; justify-content: space-between; width: 100%; padding: 10px 20px; background: #f0f0f0; border-bottom: 1px solid #ddd; }
         .time-box { text-align: left; }
         .time-box.right { text-align: right; }
@@ -72,6 +76,8 @@
             <button class="tool-btn" onclick="clearCanvas()">Clear</button>
             <button class="tool-btn" onclick="saveCanvas()">Save</button>
         </div>
+        <span class="audio-status" id="audioStatus">🔇 Audio: connecting...</span>
+        <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="100" oninput="updateVolume()" title="Volume">
         <a href="video.html" id="backLink" class="back">&larr; Back</a>
     </div>
     <div class="canvas-container">
@@ -110,7 +116,16 @@
         let peer = null;
         let audioStream = null;
         let currentCall = null;
+        let studentRetries = 0;
+        const MAX_RETRIES = 10;
         const tutorPeerId = 'session-' + sessionDate + '-' + sessionHour;
+        const statusEl = document.getElementById('audioStatus');
+
+        function setAudioStatus(text, cls) {
+            statusEl.textContent = text;
+            statusEl.className = 'audio-status';
+            if (cls) statusEl.classList.add(cls);
+        }
 
         // Initialize mic and PeerJS audio
         async function initAudio() {
@@ -122,8 +137,11 @@
                         autoGainControl: true
                     }
                 });
+                return true;
             } catch (err) {
                 console.error('Mic error:', err);
+                setAudioStatus('Mic access denied', 'error');
+                return false;
             }
         }
 
@@ -131,20 +149,37 @@
             peer = new Peer(tutorPeerId);
 
             peer.on('open', () => {
-                console.log('Tutor audio ready');
+                setAudioStatus('Waiting for student...');
             });
 
             peer.on('call', (call) => {
                 call.answer(audioStream);
                 currentCall = call;
+                setAudioStatus('Student connected!');
 
                 call.on('stream', (remoteStream) => {
                     playAudio(remoteStream);
+                    setAudioStatus('Connected', 'connected');
+                });
+
+                call.on('close', () => {
+                    setAudioStatus('Student disconnected');
+                });
+
+                call.on('error', (err) => {
+                    console.error('Call error:', err);
+                    setAudioStatus('Call error', 'error');
                 });
             });
 
             peer.on('error', (err) => {
                 console.error('Peer error:', err);
+                setAudioStatus('Connection error', 'error');
+            });
+
+            peer.on('disconnected', () => {
+                setAudioStatus('Reconnecting...');
+                peer.reconnect();
             });
         }
 
@@ -152,21 +187,58 @@
             peer = new Peer();
 
             peer.on('open', () => {
-                const call = peer.call(tutorPeerId, audioStream);
-                currentCall = call;
-
-                call.on('stream', (remoteStream) => {
-                    playAudio(remoteStream);
-                });
-
-                call.on('error', (err) => {
-                    console.error('Call error:', err);
-                });
+                setAudioStatus('Calling tutor...');
+                attemptCall();
             });
 
             peer.on('error', (err) => {
                 console.error('Peer error:', err);
+                setAudioStatus('Connection error', 'error');
             });
+
+            peer.on('disconnected', () => {
+                setAudioStatus('Reconnecting...');
+                peer.reconnect();
+            });
+        }
+
+        function attemptCall() {
+            if (studentRetries >= MAX_RETRIES) {
+                setAudioStatus('Could not reach tutor. Refresh to retry.', 'error');
+                return;
+            }
+            studentRetries++;
+            setAudioStatus('Calling tutor... (' + studentRetries + '/' + MAX_RETRIES + ')');
+
+            const call = peer.call(tutorPeerId, audioStream);
+            currentCall = call;
+
+            call.on('stream', (remoteStream) => {
+                playAudio(remoteStream);
+                setAudioStatus('Connected', 'connected');
+                studentRetries = 0;
+            });
+
+            call.on('close', () => {
+                setAudioStatus('Tutor disconnected');
+            });
+
+            call.on('error', (err) => {
+                console.error('Call error:', err);
+                if (studentRetries < MAX_RETRIES) {
+                    setAudioStatus('Tutor not available, retrying in 2s...');
+                    setTimeout(() => attemptCall(), 2000);
+                } else {
+                    setAudioStatus('Could not reach tutor. Refresh to retry.', 'error');
+                }
+            });
+        }
+
+        function updateVolume() {
+            const audio = document.getElementById('remoteAudio');
+            if (audio) {
+                audio.volume = document.getElementById('volumeSlider').value / 100;
+            }
         }
 
         function playAudio(stream) {
@@ -176,29 +248,50 @@
                 audio.id = 'remoteAudio';
                 audio.autoplay = true;
                 audio.playsInline = true;
+                audio.volume = document.getElementById('volumeSlider').value / 100;
                 document.body.appendChild(audio);
             }
             audio.srcObject = stream;
-            audio.play().catch(e => console.log('Autoplay blocked'));
+            audio.play().catch(e => console.log('Autoplay blocked, click anywhere to enable'));
         }
 
-        // Enable audio on user interaction (autoplay policy)
-        document.body.addEventListener('click', () => {
+        // Enable audio on user interaction (autoplay policy) - multiple attempts allowed
+        document.body.addEventListener('click', function resumeAudio() {
             const audio = document.getElementById('remoteAudio');
-            if (audio) {
-                audio.play().then(() => {}).catch(e => {});
+            if (audio && audio.paused && audio.srcObject) {
+                audio.play().catch(() => {});
             }
-        }, { once: true });
+        });
 
-        // Initialize audio on load
+        // Initialize audio on load with a delay to let old peer disconnect
         (async function() {
-            await initAudio();
+            const ok = await initAudio();
+            if (!ok) return;
+
+            // Small delay to let previous peer (from video.html) fully disconnect
+            await new Promise(r => setTimeout(r, 500));
+
             if (isTutor) {
                 setupTutorAudio();
             } else {
                 setupStudentAudio();
             }
         })();
+
+        // Clean up peer when leaving the page
+        window.addEventListener('beforeunload', () => {
+            if (currentCall) {
+                currentCall.close();
+                currentCall = null;
+            }
+            if (peer) {
+                peer.destroy();
+                peer = null;
+            }
+            if (audioStream) {
+                audioStream.getTracks().forEach(t => t.stop());
+            }
+        });
 
         // Join the room for this session
         socket.emit('join-room', roomId);
