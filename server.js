@@ -72,7 +72,7 @@ app.use(express.static(path.join(__dirname, '.')));
 
 // Hardcoded tutor password (stored hashed with salt on server)
 const TUTOR_SALT = 'math_site_salt_2024';
-const TUTOR_PASSWORD_HASH = '703e110ea4de4bba15675565beb04f172abc91d2a885b38257dec10cfe5f8d33'; // SHA-256(salt + 'aladan64SOFT12v?')
+const TUTOR_PASSWORD_HASH = '74bbb24a35914189f3532865e01f23d2d1259c53b646ab96a350534b32c6d9d7'; // SHA-256(salt + new password)
 
 function verifyPassword(input) {
     const hash = crypto.createHash('sha256').update(TUTOR_SALT + input).digest('hex');
