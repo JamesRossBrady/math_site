@@ -889,9 +889,8 @@
                         <div class="email">${user.email}</div>
                         <div class="date">Joined: ${date}</div>
                         <div class="free-sessions">
-                            <button class="free-sessions-btn add" onclick="updateFreeSessions(${user.id}, 1)" title="Add 1 free session">+</button>
-                            <span class="free-sessions-count">${freeSessions} free</span>
-                            <button class="free-sessions-btn remove" onclick="updateFreeSessions(${user.id}, -1)" title="Remove 1 free session" ${freeSessions <= 0 ? 'disabled' : ''}>-</button>
+                            <button class="free-sessions-btn add" onclick="updateFreeSessions(${user.id}, 1)" title="Add 1 session">+</button>
+                            <span class="free-sessions-count">${freeSessions} available</span>
                         </div>
                         <button class="delete-user-btn" onclick="deleteUser(${user.id}, '${user.username}')" title="Delete user">Delete</button>
                     `;
