@@ -579,15 +579,18 @@ app.get('/api/users', authenticateTutor, async (req, res) => {
     }
 });
 
-// Delete a user and their sessions
+// Delete a user and reset their sessions
 app.delete('/api/users/:id', authenticateTutor, async (req, res) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
         console.log('Deleting user:', id);
         await client.query('BEGIN');
-        await client.query('DELETE FROM sessions WHERE student_id = $1', [id]);
-        console.log('Deleted sessions for user:', id);
+        // Reset sessions to available instead of deleting them
+        await client.query(
+            `UPDATE sessions SET status = 'available', student_id = NULL, subject = NULL, textbook = NULL, chapter = NULL, struggling = NULL, paid = FALSE, updated_at = CURRENT_TIMESTAMP
+             WHERE student_id = $1`, [id]);
+        console.log('Reset sessions for user:', id);
         await client.query('DELETE FROM users WHERE id = $1', [id]);
         console.log('Deleted user:', id);
         await client.query('COMMIT');
@@ -595,6 +598,7 @@ app.delete('/api/users/:id', authenticateTutor, async (req, res) => {
         // Notify all calendars about user deletion
         console.log('Emitting user-deleted for user:', id);
         io.to('calendar').emit('user-deleted', { userId: id });
+        io.to('calendar').emit('session-updated', {}); // refresh calendars
 
         res.json({ success: true });
     } catch (err) {
