@@ -290,8 +290,10 @@
 </head>
 <body>
     <div class="header">
-        <h1>Learn Math with James</h1>
-        <p style="font-size:12px;color:#666;margin-top:2px;">$25 charged on your card once session is confirmed</p>
+        <div>
+            <h1>Learn Math with James</h1>
+            <p style="font-size:14px;margin-top:5px;">Sessions: <strong id="availableSessions" style="font-size:20px;color:#4CAF50;">0</strong></p>
+        </div>
         <div>
             <a href="settings.html">Account Settings</a>
             <a href="#" class="logout" onclick="logout()">Log Out</a>
@@ -394,6 +396,19 @@
         });
 
         // Join calendar room for real-time updates
+        // Load user's available credits
+        async function loadCredits() {
+            try {
+                const response = await fetch('/api/user/' + user.id);
+                const data = await response.json();
+                document.getElementById('availableSessions').textContent = data.free_sessions || 0;
+            } catch (err) {
+                console.error('Error loading credits:', err);
+            }
+        }
+
+        loadCredits();
+
         const socket = io();
         socket.emit('join-calendar');
 
@@ -403,6 +418,7 @@
             clearTimeout(refreshTimeout);
             refreshTimeout = setTimeout(() => {
                 generateCalendar(currentWeekOffset);
+                loadCredits();
                 // Show notification after calendar updates
                 if (session) {
                     const hour = session.slot_hour;
@@ -424,6 +440,14 @@
                 sessionStorage.removeItem('user');
                 alert('Your account has been deleted by the tutor.');
                 window.location.href = 'index.html';
+            }
+        });
+
+        // Listen for credits updates (from tutor giving session)
+        socket.on('credits-updated', (data) => {
+            const user = JSON.parse(sessionStorage.getItem('user'));
+            if (user && data.userId == user.id) {
+                loadCredits();
             }
         });
 

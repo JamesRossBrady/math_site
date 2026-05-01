@@ -21,7 +21,6 @@
         .btn-primary { background-color: #4CAF50; color: white; text-decoration: none; display: inline-block; }
         .message { padding: 15px; border-radius: 5px; margin-bottom: 20px; }
         .message.success { background-color: #e8f5e9; color: #2e7d32; }
-        .message.error { background-color: #ffebee; color: #c62828; }
     </style>
 </head>
 <body>
@@ -47,19 +46,19 @@
         </div>
 
         <div class="section">
-            <h2>Your Sessions</h2>
+            <h2>Available Sessions</h2>
             <div class="info-row">
-                <span class="info-label">Available Sessions</span>
-                <span class="info-value" id="credits">0</span>
+                <span class="info-label">Sessions Available</span>
+                <span class="info-value" id="credits" style="font-size:24px;">0</span>
             </div>
         </div>
 
         <div class="section">
             <h2>Get Sessions</h2>
             <div id="paymentMessage"></div>
-            <a href="https://buy.stripe.com/dRmeVc3Ik1Kw1GU8Oo2kw00" class="btn btn-primary" style="display:inline-block;text-decoration:none;text-align:center;">Buy Sessions ($25)</a>
+            <a href="https://buy.stripe.com/dRmeVc3Ik1Kw1GU8Oo2kw00" class="btn btn-primary">Buy Sessions ($25)</a>
             <a href="dashboard.html" class="btn" style="background:#666;color:white;text-decoration:none;padding:12px 24px;border-radius:5px;margin-left:10px;">Back to Calendar</a>
-            <p style="margin-top:10px;font-size:14px;color:#666;">Click to pay. After payment, you'll be redirected back here.</p>
+            <p style="margin-top:10px;font-size:14px;color:#666;">Click to pay $25 per session</p>
         </div>
     </div>
 
@@ -78,12 +77,13 @@
 
         if (sessionId) {
             const message = document.getElementById('paymentMessage');
-            message.textContent = 'Payment received! Your session is now active. Go to calendar to book your slot.';
+            message.textContent = 'Payment received! Your session is now active. Go to calendar to book.';
             message.className = 'message success';
             window.history.replaceState({}, document.title, window.location.pathname);
         }
 
-        checkCredits();
+        // Load credits from server
+        async function loadCredits() {
             try {
                 const response = await fetch('/api/user/' + user.id);
                 const data = await response.json();
@@ -92,6 +92,9 @@
                 console.error('Error:', err);
             }
         }
+
+        loadCredits();
+        setInterval(loadCredits, 5000); // Auto-refresh every 5 seconds
 
         function logout() {
             sessionStorage.removeItem('user');

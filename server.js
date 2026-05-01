@@ -468,6 +468,10 @@ app.post('/api/user/free-sessions', async (req, res) => {
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
+
+        // Notify the student their credits were updated
+        io.to('calendar').emit('credits-updated', { userId: parseInt(userId), freeSessions: result.rows[0].free_sessions });
+
         res.json(result.rows[0]);
     } catch (err) {
         console.error(err);
