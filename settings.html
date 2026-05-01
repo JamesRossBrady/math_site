@@ -22,6 +22,7 @@
         .message { padding: 15px; border-radius: 5px; margin-bottom: 20px; }
         .message.success { background-color: #e8f5e9; color: #2e7d32; }
     </style>
+    <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
 </head>
 <body>
     <div class="header">
@@ -76,17 +77,21 @@
         const sessionId = urlParams.get('session_id');
 
         if (sessionId) {
+            console.log('Payment session detected:', sessionId);
             // Add 1 session for the payment they just made
             fetch('/api/user/free-sessions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId: user.id, amount: 1 })
-            }).then(() => {
+            }).then(res => res.json()).then(data => {
+                console.log('Session added:', data);
                 const message = document.getElementById('paymentMessage');
                 message.textContent = 'Payment received! +1 session added. Go to calendar to book.';
                 message.className = 'message success';
                 window.history.replaceState({}, document.title, window.location.pathname);
                 loadCredits();
+            }).catch(err => {
+                console.error('Error adding session:', err);
             });
         }
 
@@ -103,6 +108,15 @@
 
         loadCredits();
         setInterval(loadCredits, 5000); // Auto-refresh every 5 seconds
+
+        // Also listen for live credits updates
+        const socket = io();
+        socket.emit('join-calendar');
+        socket.on('credits-updated', (data) => {
+            if (data.userId == user.id) {
+                document.getElementById('credits').textContent = data.freeSessions;
+            }
+        });
 
         function logout() {
             sessionStorage.removeItem('user');
