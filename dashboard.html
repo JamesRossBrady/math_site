@@ -376,11 +376,12 @@
 
     <!-- No Sessions Modal -->
     <div class="modal" id="noSessionsModal">
-        <div class="modal-content" style="text-align:center;">
+        <div class="modal-content" style="text-align:center;position:relative;">
+            <button type="button" onclick="document.getElementById('noSessionsModal').classList.remove('active')" style="position:absolute;top:10px;right:10px;font-size:24px;background:none;border:none;cursor:pointer;">&times;</button>
             <h3>Learn Math with James</h3>
             <p style="font-size:16px;margin:20px 0;">No sessions left.<br>Buy more sessions in payment.</p>
-            <div class="modal-buttons">
-                <button type="button" class="btn-confirm" onclick="window.location.href='payment.html'">OK</button>
+            <div style="position:absolute;bottom:20px;right:20px;">
+                <button type="button" class="btn-confirm" onclick="window.location.href='payment.html'">Go to Payment</button>
             </div>
         </div>
     </div>
@@ -629,7 +630,6 @@
                 // If they have at least 1 session, they can book
                 if (data.free_sessions < 1) {
                     document.getElementById('noSessionsModal').classList.add('active');
-                    window.location.href = 'payment.html';
                     return;
                 }
 
