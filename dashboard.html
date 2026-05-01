@@ -342,27 +342,25 @@
     <div class="modal" id="bookingModal">
         <div class="modal-content">
             <h3>Book Session</h3>
-            <p style="font-weight:bold;color:#c62828;">You will use 1 available session upon confirming</p>
             <form id="bookingForm">
                 <div class="form-group">
                     <label for="subject">Subject</label>
-                    <div style="padding:12px;font-weight:bold;">Algebra</div>
-                    <input type="hidden" id="subject" name="subject" value="Algebra">
+                    <input type="text" id="subject" name="subject" value="Algebra" style="text-align:left;" required>
                 </div>
 
                 <div class="form-group">
                     <label for="textbook">Textbook</label>
-                    <input type="text" id="textbook" name="textbook" value="Algebra" required>
+                    <input type="text" id="textbook" name="textbook" placeholder="States of Matter by David Goodstein" required>
                 </div>
 
                 <div class="form-group">
                     <label for="chapter">Chapter</label>
-                    <input type="text" id="chapter" name="chapter" value="General" required>
+                    <input type="text" id="chapter" name="chapter" placeholder="2,3,5..." required>
                 </div>
 
                 <div class="form-group">
                     <label for="struggling">What are you struggling with?</label>
-                    <textarea id="struggling" name="struggling" maxlength="2000" oninput="updateWordCount()">N/A</textarea>
+                    <textarea id="struggling" name="struggling" maxlength="2000" oninput="updateWordCount()" placeholder="my aunt Sally"></textarea>
                     <p class="word-count"><span id="wordCount">0</span> / 2000 words</p>
                 </div>
 
@@ -370,6 +368,7 @@
                     <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
                     <button type="submit" class="btn-confirm">Confirm Booking</button>
                 </div>
+                <p style="font-weight:bold;color:#c62828;margin-top:10px;">You will use 1 available session upon confirming</p>
             </form>
         </div>
     </div>
