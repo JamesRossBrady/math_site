@@ -76,10 +76,18 @@
         const sessionId = urlParams.get('session_id');
 
         if (sessionId) {
-            const message = document.getElementById('paymentMessage');
-            message.textContent = 'Payment received! Your session is now active. Go to calendar to book.';
-            message.className = 'message success';
-            window.history.replaceState({}, document.title, window.location.pathname);
+            // Add 1 session for the payment they just made
+            fetch('/api/user/free-sessions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.id, amount: 1 })
+            }).then(() => {
+                const message = document.getElementById('paymentMessage');
+                message.textContent = 'Payment received! +1 session added. Go to calendar to book.';
+                message.className = 'message success';
+                window.history.replaceState({}, document.title, window.location.pathname);
+                loadCredits();
+            });
         }
 
         // Load credits from server
