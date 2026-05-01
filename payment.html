@@ -75,16 +75,22 @@
         // Check for Stripe redirect (they paid and returned)
         const urlParams = new URLSearchParams(window.location.search);
         const sessionId = urlParams.get('session_id');
+        console.log('URL params:', window.location.search);
+        console.log('Session ID from URL:', sessionId);
 
         if (sessionId) {
-            console.log('Payment session detected:', sessionId);
+            console.log('Processing payment for session:', sessionId);
+            console.log('User ID:', user.id);
             // Add 1 session for the payment they just made
             fetch('/api/user/free-sessions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId: user.id, amount: 1 })
-            }).then(res => res.json()).then(data => {
-                console.log('Session added:', data);
+            }).then(res => {
+                console.log('Response status:', res.status);
+                return res.json();
+            }).then(data => {
+                console.log('Session added response:', data);
                 const message = document.getElementById('paymentMessage');
                 message.textContent = 'Payment received! +1 session added. Go to calendar to book.';
                 message.className = 'message success';
@@ -93,6 +99,8 @@
             }).catch(err => {
                 console.error('Error adding session:', err);
             });
+        } else {
+            console.log('No session_id in URL - this might not be a payment return');
         }
 
         // Load credits from server

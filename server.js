@@ -485,9 +485,12 @@ app.delete('/api/users/:id', async (req, res) => {
 
 // Update free sessions for a user
 app.post('/api/user/free-sessions', async (req, res) => {
+    console.log('free-sessions API called:', req.body);
     try {
         const { userId, amount } = req.body;
+        console.log('Adding', amount, 'sessions to user', userId);
         if (!userId || amount === undefined) {
+            console.log('Missing userId or amount');
             return res.status(400).json({ error: 'userId and amount required' });
         }
         const result = await pool.query(
@@ -495,15 +498,18 @@ app.post('/api/user/free-sessions', async (req, res) => {
             [amount, userId]
         );
         if (result.rows.length === 0) {
+            console.log('User not found:', userId);
             return res.status(404).json({ error: 'User not found' });
         }
+
+        console.log('Updated user sessions:', result.rows[0].free_sessions);
 
         // Notify the student their credits were updated
         io.to('calendar').emit('credits-updated', { userId: parseInt(userId), freeSessions: result.rows[0].free_sessions });
 
         res.json(result.rows[0]);
     } catch (err) {
-        console.error(err);
+        console.error('Error in free-sessions:', err);
         res.status(500).json({ error: 'Database error' });
     }
 });
