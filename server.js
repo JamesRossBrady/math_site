@@ -147,19 +147,18 @@ app.get('/api/sessions', async (req, res) => {
     }
 });
 
-// Book a session (create pending request)
+// Book a session (immediate booking - student paid upfront)
 app.post('/api/sessions/book', async (req, res) => {
     try {
         const { slot_date, slot_hour, subject, textbook, chapter, struggling, userId } = req.body;
 
-        // Parse slot_date and slot_hour properly
         const parsedDate = String(slot_date);
         const parsedHour = parseInt(slot_hour);
         const parsedUserId = parseInt(userId);
 
-        // Check user for free_sessions OR payment method
+        // Check user has credits
         const userResult = await pool.query(
-            'SELECT stripe_customer_id, free_sessions FROM users WHERE id = $1',
+            'SELECT free_sessions FROM users WHERE id = $1',
             [parsedUserId]
         );
 
@@ -169,23 +168,21 @@ app.post('/api/sessions/book', async (req, res) => {
 
         const user = userResult.rows[0];
 
-        // Count user's pending/confirmed sessions
+        // Count user's active sessions
         const sessionCount = await pool.query(
             "SELECT COUNT(*) FROM sessions WHERE student_id = $1 AND status IN ('pending', 'confirmed')",
             [parsedUserId]
         );
         const activeSessions = parseInt(sessionCount.rows[0].count);
 
-        const hasFreeCredit = user.free_sessions > activeSessions;
-        const hasPayment = !!user.stripe_customer_id;
-
-        if (!hasFreeCredit && !hasPayment) {
-            return res.status(400).json({ error: 'No sessions left. Add payment method.' });
+        if (user.free_sessions <= activeSessions) {
+            return res.status(400).json({ error: 'No sessions left. Buy more in settings.' });
         }
 
+        // Book directly as confirmed (no tutor confirmation needed)
         const result = await pool.query(
             `UPDATE sessions
-             SET status = 'pending', student_id = $7, subject = $3, textbook = $4, chapter = $5, struggling = $6, updated_at = CURRENT_TIMESTAMP
+             SET status = 'confirmed', student_id = $7, subject = $3, textbook = $4, chapter = $5, struggling = $6, paid = TRUE, updated_at = CURRENT_TIMESTAMP
              WHERE slot_date = $1 AND slot_hour = $2 AND status = 'available'
              RETURNING id, slot_date, slot_hour, status`,
             [parsedDate, parsedHour, subject, textbook, chapter, struggling, parsedUserId]

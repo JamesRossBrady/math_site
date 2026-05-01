@@ -11,29 +11,18 @@
         .header h1 { color: #333; }
         .nav-links { display: flex; gap: 15px; }
         .nav-links a { color: #666; text-decoration: none; padding: 10px 15px; border: 1px solid #ddd; border-radius: 5px; }
-        .nav-links a:hover { background-color: #f5f5f5; }
         .container { max-width: 600px; margin: 0 auto; }
         .section { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
         .section h2 { margin-bottom: 20px; color: #333; }
         .info-row { display: flex; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #eee; }
         .info-label { color: #666; }
         .info-value { color: #333; font-weight: bold; }
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; margin-bottom: 8px; color: #333; font-weight: bold; }
-        #card-element { padding: 12px; border: 1px solid #ddd; border-radius: 5px; background: white; }
         .btn { padding: 12px 24px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
-        .btn-primary { background-color: #4CAF50; color: white; }
-        .btn-primary:hover { background-color: #45a049; }
-        .btn-primary:disabled { background-color: #ccc; cursor: not-allowed; }
+        .btn-primary { background-color: #4CAF50; color: white; text-decoration: none; display: inline-block; }
         .message { padding: 15px; border-radius: 5px; margin-bottom: 20px; }
         .message.success { background-color: #e8f5e9; color: #2e7d32; }
         .message.error { background-color: #ffebee; color: #c62828; }
-        .payment-status { display: flex; align-items: center; gap: 10px; }
-        .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 14px; }
-        .status-badge.active { background-color: #e8f5e9; color: #2e7d32; }
-        .status-badge.inactive { background-color: #ffebee; color: #c62828; }
     </style>
-    <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
     <div class="header">
@@ -58,32 +47,18 @@
         </div>
 
         <div class="section">
-            <h2>Free Sessions</h2>
+            <h2>Your Sessions</h2>
             <div class="info-row">
-                <span class="info-label">Available Free Sessions</span>
-                <span class="info-value" id="freeSessions">Loading...</span>
+                <span class="info-label">Available Sessions</span>
+                <span class="info-value" id="credits">0</span>
             </div>
         </div>
 
         <div class="section">
-            <h2>Payment Method</h2>
+            <h2>Get Sessions</h2>
             <div id="paymentMessage"></div>
-
-            <div class="payment-status">
-                <span>Stripe Payment Method:</span>
-                <span class="status-badge inactive" id="paymentStatus">Not Added</span>
-            </div>
-
-            <br>
-
-            <div class="form-group">
-                <label>Add or Update Card</label>
-                <div id="card-element"></div>
-            </div>
-
-            <button class="btn btn-primary" id="saveCardBtn">Save Card</button>
-            <a href="dashboard.html" class="btn" style="background:#666;color:white;text-decoration:none;padding:12px 24px;border-radius:5px;margin-left:10px;">Back to Calendar</a>
-            <p style="margin-top:10px;font-size:14px;color:#666;">No charge will be made until you confirm a session.</p>
+            <a href="https://buy.stripe.com/dRmeVc3Ik1Kw1GU8Oo2kw00" class="btn btn-primary">Buy Sessions ($25 each)</a>
+            <p style="margin-top:10px;font-size:14px;color:#666;">Click to buy sessions. You'll have immediate access to book.</p>
         </div>
     </div>
 
@@ -96,98 +71,59 @@
         document.getElementById('username').textContent = user.username;
         document.getElementById('email').textContent = user.email;
 
-        let stripe, cardElement;
+        // Check for Stripe redirect
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session_id');
 
-        // Initialize Stripe
-        if (typeof Stripe !== 'undefined') {
-            stripe = Stripe('pk_live_51TQsYgAoZCeoX20P4eL4bGqN7XTGysrbE6ne9jjnZqEXp2So9exxgVB2Z3vQ06CHRVE6NYRxMF2kiUrHa72eNLfz00uiv3rONw');
-            const elements = stripe.elements();
-            cardElement = elements.create('card', { style: { base: { fontSize: '16px' } } });
-            setTimeout(() => cardElement.mount('#card-element'), 100);
+        if (sessionId) {
+            verifyPayment(sessionId);
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
 
-        checkPaymentStatus();
+        checkCredits();
 
-        document.getElementById('saveCardBtn').addEventListener('click', async () => {
-            const btn = document.getElementById('saveCardBtn');
+        async function verifyPayment(sessionId) {
             const message = document.getElementById('paymentMessage');
-            btn.disabled = true;
-            btn.textContent = 'Saving...';
-
-            if (!stripe || !cardElement) {
-                message.textContent = 'Stripe not loaded. Refresh and try again.';
-                message.className = 'message error';
-                btn.disabled = false;
-                btn.textContent = 'Save Card';
-                return;
-            }
+            message.textContent = 'Verifying payment...';
 
             try {
-                // Get SetupIntent client secret from server
-                const setupRes = await fetch('/api/stripe/create-setup', { method: 'POST' });
-                const { clientSecret, error: setupError } = await setupRes.json();
-
-                if (setupError) {
-                    message.textContent = setupError;
-                    message.className = 'message error';
-                    btn.disabled = false;
-                    btn.textContent = 'Save Card';
-                    return;
-                }
-
-                // Confirm card setup (no charge!)
-                const { setupIntent, error } = await stripe.confirmCardSetup(clientSecret, {
-                    payment_method: { card: cardElement }
-                });
-
-                if (error) {
-                    message.textContent = error.message;
-                    message.className = 'message error';
-                    btn.disabled = false;
-                    btn.textContent = 'Save Card';
-                    return;
-                }
-
-                // Save payment method to user
-                const saveRes = await fetch('/api/user/payment-method', {
+                const response = await fetch('/api/stripe/verify-session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: user.id, paymentMethodId: setupIntent.payment_method })
+                    body: JSON.stringify({ sessionId })
                 });
 
-                if (saveRes.ok) {
-                    message.textContent = 'Payment method saved! No charge will be made until you confirm a session.';
+                const data = await response.json();
+
+                if (response.ok && data.paymentMethodId) {
+                    // Add a paid session to their account
+                    await fetch('/api/user/free-sessions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId: user.id, amount: 1 })
+                    });
+
+                    message.textContent = 'Payment successful! You now have 1 session to book.';
                     message.className = 'message success';
-                    checkPaymentStatus();
                 } else {
-                    const data = await saveRes.json();
-                    message.textContent = data.error || 'Failed to save';
+                    message.textContent = 'Payment verification failed';
                     message.className = 'message error';
                 }
             } catch (err) {
-                message.textContent = 'Connection error. Please try again.';
+                message.textContent = 'Error verifying payment';
                 message.className = 'message error';
             }
 
-            btn.disabled = false;
-            btn.textContent = 'Save Card';
-        });
+            checkCredits();
+        }
 
-        async function checkPaymentStatus() {
+        async function checkCredits() {
             try {
                 const response = await fetch('/api/user/' + user.id);
                 const data = await response.json();
-                const statusEl = document.getElementById('paymentStatus');
-
-                if (data.stripe_customer_id) {
-                    statusEl.textContent = 'Added';
-                    statusEl.classList.remove('inactive');
-                    statusEl.classList.add('active');
-                }
-
-                document.getElementById('freeSessions').textContent = data.free_sessions || 0;
+                document.getElementById('credits').textContent = data.free_sessions || 0;
             } catch (err) {
-                console.error('Error checking payment status:', err);
+                console.error('Error:', err);
             }
         }
 

@@ -609,11 +609,11 @@
                 const userSessions = allSessions.filter(s => s.student_id == user.id && (s.status === 'pending' || s.status === 'confirmed'));
                 const activeSessions = userSessions.length;
 
-                const hasFreeCredit = data.free_sessions > activeSessions;
-                const hasPayment = !!data.stripe_customer_id;
+                // Just check if they have credits
+                const hasCredits = data.free_sessions > activeSessions;
 
-                if (!hasFreeCredit && !hasPayment) {
-                    alert('No sessions left. Add payment method.\nRedirecting to settings...');
+                if (!hasCredits) {
+                    alert('No sessions left. Buy more sessions in settings.');
                     window.location.href = 'settings.html';
                     return;
                 }
