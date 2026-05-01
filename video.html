@@ -180,13 +180,28 @@
         }
 
         // Play remotely received audio
+        let audioInitialized = false;
+
         function playAudio(stream) {
-            const audio = document.createElement('audio');
+            let audio = document.getElementById('remoteAudio');
+            if (!audio) {
+                audio = document.createElement('audio');
+                audio.id = 'remoteAudio';
+                audio.autoplay = true;
+                audio.playsInline = true;
+                document.body.appendChild(audio);
+            }
             audio.srcObject = stream;
-            audio.autoplay = true;
-            audio.playsInline = true;
-            audio.id = 'remoteAudio';
+            audio.play().catch(e => console.log('Autoplay blocked, click to enable'));
         }
+
+        // Enable audio on first user interaction (required by browsers)
+        document.body.addEventListener('click', () => {
+            const audio = document.getElementById('remoteAudio');
+            if (audio && !audioInitialized) {
+                audio.play().then(() => { audioInitialized = true; }).catch(e => {});
+            }
+        }, { once: true });
 
         async function connectAudio() {
             await initAudio();

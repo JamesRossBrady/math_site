@@ -170,15 +170,25 @@
         }
 
         function playAudio(stream) {
-            // Only create audio element if not already present
-            if (!document.getElementById('remoteAudio')) {
-                const audio = document.createElement('audio');
+            let audio = document.getElementById('remoteAudio');
+            if (!audio) {
+                audio = document.createElement('audio');
                 audio.id = 'remoteAudio';
-                audio.srcObject = stream;
                 audio.autoplay = true;
                 audio.playsInline = true;
+                document.body.appendChild(audio);
             }
+            audio.srcObject = stream;
+            audio.play().catch(e => console.log('Autoplay blocked'));
         }
+
+        // Enable audio on user interaction (autoplay policy)
+        document.body.addEventListener('click', () => {
+            const audio = document.getElementById('remoteAudio');
+            if (audio) {
+                audio.play().then(() => {}).catch(e => {});
+            }
+        }, { once: true });
 
         // Initialize audio on load
         (async function() {
