@@ -73,14 +73,21 @@
         document.getElementById('email').textContent = user.email;
 
         // Check for Stripe redirect (they paid and returned)
+        // Check for Stripe redirect with any parameters
         const urlParams = new URLSearchParams(window.location.search);
         const sessionId = urlParams.get('session_id');
-        console.log('URL params:', window.location.search);
-        console.log('Session ID from URL:', sessionId);
+        const paymentIntent = urlParams.get('payment_intent');
+        const setupIntent = urlParams.get('setup_intent');
+        const redirectStatus = urlParams.get('redirect_status');
 
-        if (sessionId) {
-            console.log('Processing payment for session:', sessionId);
-            console.log('User ID:', user.id);
+        console.log('All URL params:', Object.fromEntries(urlParams));
+        console.log('Session ID:', sessionId);
+        console.log('Payment Intent:', paymentIntent);
+        console.log('Setup Intent:', setupIntent);
+        console.log('Redirect Status:', redirectStatus);
+
+        if (sessionId || paymentIntent || (redirectStatus === 'success')) {
+            console.log('Processing payment return...');
             // Add 1 session for the payment they just made
             fetch('/api/user/free-sessions', {
                 method: 'POST',
@@ -100,7 +107,7 @@
                 console.error('Error adding session:', err);
             });
         } else {
-            console.log('No session_id in URL - this might not be a payment return');
+            console.log('No payment parameters found in URL');
         }
 
         // Load credits from server
