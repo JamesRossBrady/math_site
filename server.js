@@ -192,8 +192,23 @@ app.post('/api/sessions/book', async (req, res) => {
             return res.status(400).json({ error: 'Slot not available' });
         }
 
+        // Deduct one session from user's available sessions
+        await pool.query(
+            'UPDATE users SET free_sessions = free_sessions - 1 WHERE id = $1',
+            [parsedUserId]
+        );
+
+        // Get updated free_sessions
+        const updatedUser = await pool.query(
+            'SELECT free_sessions FROM users WHERE id = $1',
+            [parsedUserId]
+        );
+
         // Notify all calendars
         io.to('calendar').emit('session-updated', result.rows[0]);
+
+        // Notify the student their credits were updated
+        io.to('calendar').emit('credits-updated', { userId: parsedUserId, freeSessions: updatedUser.rows[0].free_sessions });
 
         res.json(result.rows[0]);
     } catch (err) {
@@ -319,6 +334,17 @@ app.post('/api/sessions/cancel', async (req, res) => {
     try {
         const { slot_date, slot_hour } = req.body;
 
+        // First get the student_id before canceling
+        const sessionCheck = await pool.query(
+            'SELECT student_id, status FROM sessions WHERE slot_date = $1 AND slot_hour = $2 AND status IN (\'pending\', \'confirmed\')',
+            [slot_date, slot_hour]
+        );
+
+        let studentId = null;
+        if (sessionCheck.rows.length > 0) {
+            studentId = sessionCheck.rows[0].student_id;
+        }
+
         const result = await pool.query(
             `UPDATE sessions
              SET status = 'available', student_id = NULL, subject = NULL, textbook = NULL, chapter = NULL, struggling = NULL, paid = FALSE, updated_at = CURRENT_TIMESTAMP
@@ -332,6 +358,16 @@ app.post('/api/sessions/cancel', async (req, res) => {
         }
 
         const cancelledSession = result.rows[0];
+
+        // If a student had booked it, give them back their session
+        if (studentId) {
+            await pool.query(
+                'UPDATE users SET free_sessions = free_sessions + 1 WHERE id = $1',
+                [studentId]
+            );
+            const updatedUser = await pool.query('SELECT free_sessions FROM users WHERE id = $1', [studentId]);
+            io.to('calendar').emit('credits-updated', { userId: studentId, freeSessions: updatedUser.rows[0].free_sessions });
+        }
 
         // Notify all calendars to refresh
         io.to('calendar').emit('session-updated', cancelledSession);
