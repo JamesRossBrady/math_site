@@ -21,10 +21,8 @@ const io = new Server(server, {
 });
 
 app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, '.')));
 
-// Stripe webhook for payment confirmation
+// Stripe webhook - must be BEFORE express.json() to get raw body
 app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (req, res) => {
     const sig = req.headers['stripe-signature'];
     let event;
@@ -68,6 +66,9 @@ app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (
 
     res.json({received: true});
 });
+
+app.use(express.json());
+app.use(express.static(path.join(__dirname, '.')));
 
 // Hardcoded tutor password (stored hashed with salt on server)
 const TUTOR_SALT = 'math_site_salt_2024';
