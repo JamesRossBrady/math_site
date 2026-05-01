@@ -534,8 +534,13 @@
     <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
     <script>
         // Check if tutor is logged in
-        if (!sessionStorage.getItem('tutorLoggedIn')) {
+        const token = sessionStorage.getItem('token');
+        if (!token) {
             window.location.href = 'tutor_login.html';
+        }
+
+        function authHeaders() {
+            return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
         }
 
         // Join calendar room for real-time updates
@@ -758,7 +763,7 @@
             try {
                 const response = await fetch('/api/sessions/cancel', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: authHeaders(),
                     body: JSON.stringify({
                         slot_date: selectedSlotData.date,
                         slot_hour: selectedSlotData.hour
@@ -784,7 +789,7 @@
             try {
                 const response = await fetch('/api/sessions/confirm', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: authHeaders(),
                     body: JSON.stringify({
                         slot_date: selectedSlotData.date,
                         slot_hour: selectedSlotData.hour
@@ -820,7 +825,7 @@
             try {
                 const response = await fetch('/api/sessions/reject', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: authHeaders(),
                     body: JSON.stringify({
                         slot_date: selectedSlotData.date,
                         slot_hour: selectedSlotData.hour
@@ -852,7 +857,7 @@
             try {
                 const response = await fetch(endpoint, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: authHeaders(),
                     body: JSON.stringify({
                         slot_date: slot.dataset.date,
                         slot_hour: parseInt(slot.dataset.hour)
@@ -901,13 +906,13 @@
         }
 
         function logout() {
-            sessionStorage.removeItem('tutorLoggedIn');
+            sessionStorage.removeItem('token');
             window.location.href = 'index.html';
         }
 
         async function fetchStudentList() {
             try {
-                const response = await fetch('/api/users');
+                const response = await fetch('/api/users', { headers: authHeaders() });
                 const users = await response.json();
                 const list = document.getElementById('studentList');
                 list.innerHTML = '';
@@ -937,7 +942,7 @@
         async function deleteUser(userId, username) {
             if (!confirm('Delete user "' + username + '"? This cannot be undone.')) return;
             try {
-                const response = await fetch('/api/users/' + userId, { method: 'DELETE' });
+                const response = await fetch('/api/users/' + userId, { method: 'DELETE', headers: authHeaders() });
                 const data = await response.json();
                 if (response.ok && data.success) {
                     fetchStudentList();
@@ -960,7 +965,7 @@
             try {
                 const response = await fetch('/api/user/free-sessions', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: authHeaders(),
                     body: JSON.stringify({ userId, amount })
                 });
                 if (response.ok) {

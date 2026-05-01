@@ -136,7 +136,8 @@
                 });
 
                 if (response.ok) {
-                    sessionStorage.setItem('tutorLoggedIn', 'true');
+                    const data = await response.json();
+                    sessionStorage.setItem('token', data.token);
                     window.location.href = 'tutor_dashboard.html';
                 } else {
                     document.getElementById('error').style.display = 'block';

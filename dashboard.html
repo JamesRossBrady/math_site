@@ -385,16 +385,24 @@
     <script>
         // Check if user is logged in
         const storedUser = sessionStorage.getItem('user');
-        if (!storedUser) {
+        const token = sessionStorage.getItem('token');
+        if (!storedUser || !token) {
+            sessionStorage.removeItem('user');
+            sessionStorage.removeItem('token');
             window.location.href = 'signin.html';
         }
 
         const user = JSON.parse(storedUser);
 
+        function authHeaders() {
+            return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+        }
+
         // Verify user still exists in database
-        fetch('/api/user/' + user.id).then(r => {
+        fetch('/api/user/' + user.id, { headers: authHeaders() }).then(r => {
             if (!r.ok) {
                 sessionStorage.removeItem('user');
+                sessionStorage.removeItem('token');
                 alert('Your account was deleted. Please sign up again.');
                 window.location.href = 'signup.html';
             }
@@ -406,7 +414,7 @@
         // Load user's available credits
         async function loadCredits() {
             try {
-                const response = await fetch('/api/user/' + user.id);
+                const response = await fetch('/api/user/' + user.id, { headers: authHeaders() });
                 const data = await response.json();
                 document.getElementById('availableSessions').textContent = data.free_sessions || 0;
             } catch (err) {
@@ -430,6 +438,7 @@
             const user = JSON.parse(sessionStorage.getItem('user'));
             if (user && data.userId == user.id) {
                 sessionStorage.removeItem('user');
+                sessionStorage.removeItem('token');
                 alert('Your account has been deleted by the tutor.');
                 window.location.href = 'index.html';
             }
@@ -613,9 +622,8 @@
         }
 
         async function checkBookingEligibility() {
-            const user = JSON.parse(sessionStorage.getItem('user'));
             try {
-                const response = await fetch('/api/user/' + user.id);
+                const response = await fetch('/api/user/' + user.id, { headers: authHeaders() });
                 const data = await response.json();
 
                 // If they have at least 1 session, they can book
@@ -655,20 +663,17 @@
             const chapter = document.getElementById('chapter').value;
             const struggling = document.getElementById('struggling').value;
 
-            const user = JSON.parse(sessionStorage.getItem('user'));
-
             try {
                 const response = await fetch('/api/sessions/book', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: authHeaders(),
                     body: JSON.stringify({
                         slot_date: selectedDate,
                         slot_hour: parseInt(selectedHour),
                         subject,
                         textbook,
                         chapter,
-                        struggling,
-                        userId: user.id
+                        struggling
                     })
                 });
 
@@ -698,6 +703,7 @@
         let currentSessions = []; // Store sessions for bookSlot access
         function logout() {
             sessionStorage.removeItem('user');
+            sessionStorage.removeItem('token');
             window.location.href = 'index.html';
         }
 

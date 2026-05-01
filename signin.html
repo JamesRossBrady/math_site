@@ -154,6 +154,7 @@
                 const data = await response.json();
 
                 if (response.ok) {
+                    sessionStorage.setItem('token', data.token);
                     sessionStorage.setItem('user', JSON.stringify(data.user));
                     window.location.href = 'dashboard.html';
                 } else {

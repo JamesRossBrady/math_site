@@ -65,8 +65,15 @@
 
     <script>
         const user = JSON.parse(sessionStorage.getItem('user'));
-        if (!user) {
+        const token = sessionStorage.getItem('token');
+        if (!user || !token) {
+            sessionStorage.removeItem('user');
+            sessionStorage.removeItem('token');
             window.location.href = 'signin.html';
+        }
+
+        function authHeaders() {
+            return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
         }
 
         document.getElementById('username').textContent = user.username;
@@ -91,8 +98,8 @@
             // Add 1 session for the payment they just made
             fetch('/api/user/free-sessions', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: user.id, amount: 1 })
+                headers: authHeaders(),
+                body: JSON.stringify({ amount: 1 })
             }).then(res => {
                 console.log('Response status:', res.status);
                 return res.json();
@@ -113,7 +120,7 @@
         // Load credits from server
         async function loadCredits() {
             try {
-                const response = await fetch('/api/user/' + user.id);
+                const response = await fetch('/api/user/' + user.id, { headers: authHeaders() });
                 const data = await response.json();
                 document.getElementById('credits').textContent = data.free_sessions || 0;
             } catch (err) {
@@ -135,6 +142,7 @@
 
         function logout() {
             sessionStorage.removeItem('user');
+            sessionStorage.removeItem('token');
             window.location.href = 'index.html';
         }
     </script>

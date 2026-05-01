@@ -5,11 +5,16 @@ const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 // Stripe - only initialize if API key is provided
 let stripe = null;
 if (process.env.STRIPE_API_KEY) {
     stripe = require('stripe')(process.env.STRIPE_API_KEY);
 }
+
+const JWT_SECRET = process.env.JWT_SECRET || 'math-site-dev-secret-change-me';
+const JWT_EXPIRY = '24h';
 
 const app = express();
 const server = http.createServer(app);
@@ -69,6 +74,43 @@ app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), async (
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '.')));
+
+// Auth middleware - extracts and verifies JWT from Authorization header
+function authenticateStudent(req, res, next) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
+    try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded.role && decoded.role !== 'student') {
+            return res.status(403).json({ error: 'Student access required' });
+        }
+        req.user = decoded;
+        next();
+    } catch (err) {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+}
+
+function authenticateTutor(req, res, next) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
+    try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded.role !== 'tutor') {
+            return res.status(403).json({ error: 'Tutor access required' });
+        }
+        req.user = decoded;
+        next();
+    } catch (err) {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+}
 
 // Hardcoded tutor password (stored hashed with salt on server)
 const TUTOR_SALT = 'math_site_salt_2024';
@@ -194,13 +236,13 @@ app.get('/api/sessions', async (req, res) => {
 });
 
 // Book a session (student uses their available session)
-app.post('/api/sessions/book', async (req, res) => {
+app.post('/api/sessions/book', authenticateStudent, async (req, res) => {
     try {
-        const { slot_date, slot_hour, subject, textbook, chapter, struggling, userId } = req.body;
+        const { slot_date, slot_hour, subject, textbook, chapter, struggling } = req.body;
 
         const parsedDate = String(slot_date);
         const parsedHour = parseInt(slot_hour);
-        const parsedUserId = parseInt(userId);
+        const parsedUserId = req.user.id;
 
         // Check user has at least 1 available session
         const userResult = await pool.query(
@@ -257,7 +299,7 @@ app.post('/api/sessions/book', async (req, res) => {
 });
 
 // Confirm a session (no payment - tutor waives or student pays later)
-app.post('/api/sessions/confirm', async (req, res) => {
+app.post('/api/sessions/confirm', authenticateTutor, async (req, res) => {
     try {
         const { slot_date, slot_hour } = req.body;
 
@@ -342,7 +384,7 @@ app.post('/api/sessions/confirm', async (req, res) => {
 });
 
 // Reject a session
-app.post('/api/sessions/reject', async (req, res) => {
+app.post('/api/sessions/reject', authenticateTutor, async (req, res) => {
     try {
         const { slot_date, slot_hour } = req.body;
 
@@ -369,7 +411,7 @@ app.post('/api/sessions/reject', async (req, res) => {
 });
 
 // Cancel a session (tutor cancels confirmed or pending)
-app.post('/api/sessions/cancel', async (req, res) => {
+app.post('/api/sessions/cancel', authenticateTutor, async (req, res) => {
     try {
         const { slot_date, slot_hour } = req.body;
 
@@ -419,7 +461,7 @@ app.post('/api/sessions/cancel', async (req, res) => {
 });
 
 // Mark a session as unavailable (tutor has plans)
-app.post('/api/sessions/unavailable', async (req, res) => {
+app.post('/api/sessions/unavailable', authenticateTutor, async (req, res) => {
     try {
         const { slot_date, slot_hour } = req.body;
 
@@ -443,7 +485,7 @@ app.post('/api/sessions/unavailable', async (req, res) => {
 });
 
 // Mark a session as available again
-app.post('/api/sessions/available', async (req, res) => {
+app.post('/api/sessions/available', authenticateTutor, async (req, res) => {
     try {
         const { slot_date, slot_hour } = req.body;
 
@@ -490,7 +532,7 @@ app.get('/api/sessions/details', async (req, res) => {
 });
 
 // Get all users (for tutor dashboard)
-app.get('/api/users', async (req, res) => {
+app.get('/api/users', authenticateTutor, async (req, res) => {
     try {
         const result = await pool.query(
             'SELECT id, username, email, free_sessions, created_at FROM users ORDER BY created_at DESC'
@@ -503,7 +545,7 @@ app.get('/api/users', async (req, res) => {
 });
 
 // Delete a user and their sessions
-app.delete('/api/users/:id', async (req, res) => {
+app.delete('/api/users/:id', authenticateTutor, async (req, res) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
@@ -529,19 +571,41 @@ app.delete('/api/users/:id', async (req, res) => {
     }
 });
 
-// Update free sessions for a user
+// Update free sessions for a user (tutor can set for any user, student can only add to themselves)
 app.post('/api/user/free-sessions', async (req, res) => {
+    // Authenticate as either tutor or student
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
+    let decoded;
+    try {
+        decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+    } catch (err) {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
     console.log('free-sessions API called:', req.body);
     try {
         const { userId, amount } = req.body;
-        console.log('Adding', amount, 'sessions to user', userId);
-        if (!userId || amount === undefined) {
+
+        // Determine the target user ID based on role
+        let targetUserId;
+        if (decoded.role === 'tutor') {
+            targetUserId = parseInt(userId);
+        } else {
+            // Student can only add to themselves
+            targetUserId = decoded.id;
+        }
+
+        console.log('Adding', amount, 'sessions to user', targetUserId);
+        if (!targetUserId || amount === undefined) {
             console.log('Missing userId or amount');
             return res.status(400).json({ error: 'userId and amount required' });
         }
         const result = await pool.query(
             'UPDATE users SET free_sessions = free_sessions + $1 WHERE id = $2 RETURNING id, username, free_sessions',
-            [amount, userId]
+            [amount, targetUserId]
         );
         if (result.rows.length === 0) {
             console.log('User not found:', userId);
@@ -551,7 +615,7 @@ app.post('/api/user/free-sessions', async (req, res) => {
         console.log('Updated user sessions:', result.rows[0].free_sessions);
 
         // Notify the student their credits were updated
-        io.to('calendar').emit('credits-updated', { userId: parseInt(userId), freeSessions: result.rows[0].free_sessions });
+        io.to('calendar').emit('credits-updated', { userId: targetUserId, freeSessions: result.rows[0].free_sessions });
 
         res.json(result.rows[0]);
     } catch (err) {
@@ -561,9 +625,13 @@ app.post('/api/user/free-sessions', async (req, res) => {
 });
 
 // Get user by ID
-app.get('/api/user/:id', async (req, res) => {
+app.get('/api/user/:id', authenticateStudent, async (req, res) => {
     try {
         const { id } = req.params;
+        // Students can only view their own data
+        if (parseInt(id) !== req.user.id) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
         const result = await pool.query(
             'SELECT id, username, email, stripe_customer_id, free_sessions, created_at FROM users WHERE id = $1',
             [id]
@@ -579,15 +647,15 @@ app.get('/api/user/:id', async (req, res) => {
 });
 
 // Update user payment method
-app.post('/api/user/payment-method', async (req, res) => {
+app.post('/api/user/payment-method', authenticateStudent, async (req, res) => {
     try {
-        const { userId, paymentMethodId } = req.body;
-        console.log('Saving payment for user:', userId, 'pm:', paymentMethodId);
+        const { paymentMethodId } = req.body;
+        console.log('Saving payment for user:', req.user.id, 'pm:', paymentMethodId);
 
         // Just save the payment method directly
         await pool.query(
             'UPDATE users SET stripe_customer_id = $1 WHERE id = $2',
-            [paymentMethodId, userId]
+            [paymentMethodId, req.user.id]
         );
 
         res.json({ success: true });
@@ -646,7 +714,8 @@ app.post('/api/stripe/create-setup', async (req, res) => {
 app.post('/api/tutor/login', (req, res) => {
     const { password } = req.body;
     if (verifyPassword(password)) {
-        res.json({ success: true });
+        const token = jwt.sign({ role: 'tutor' }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+        res.json({ success: true, token });
     } else {
         res.status(401).json({ error: 'Invalid password' });
     }
@@ -667,14 +736,16 @@ app.post('/api/signup', async (req, res) => {
             return res.status(400).json({ error: 'Username or email already exists' });
         }
 
-        // Hash password and insert (no payment method required at signup)
-        const hash = crypto.createHash('sha256').update(password).digest('hex');
+        // Hash password with bcrypt
+        const hash = await bcrypt.hash(password, 10);
         const result = await pool.query(
             'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id, username, email',
             [username, email, hash]
         );
 
-        res.json({ success: true, user: result.rows[0] });
+        const user = result.rows[0];
+        const token = jwt.sign({ id: user.id, username: user.username, email: user.email, role: 'student' }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+        res.json({ success: true, token, user: { id: user.id, username: user.username, email: user.email } });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Database error' });
@@ -697,13 +768,26 @@ app.post('/api/login', async (req, res) => {
         }
 
         const user = result.rows[0];
-        const hash = crypto.createHash('sha256').update(password).digest('hex');
 
-        if (hash !== user.password_hash) {
+        // Try bcrypt first, fall back to SHA-256 for legacy users
+        let valid = await bcrypt.compare(password, user.password_hash).catch(() => false);
+        if (!valid) {
+            // Legacy SHA-256 check
+            const shaHash = crypto.createHash('sha256').update(password).digest('hex');
+            if (shaHash === user.password_hash) {
+                valid = true;
+                // Migrate to bcrypt
+                const bcryptHash = await bcrypt.hash(password, 10);
+                await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [bcryptHash, user.id]);
+            }
+        }
+
+        if (!valid) {
             return res.status(401).json({ error: 'Invalid username or password' });
         }
 
-        res.json({ success: true, user: { id: user.id, username: user.username, email: user.email } });
+        const token = jwt.sign({ id: user.id, username: user.username, email: user.email, role: 'student' }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+        res.json({ success: true, token, user: { id: user.id, username: user.username, email: user.email } });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Database error' });
