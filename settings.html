@@ -165,6 +165,32 @@
             background-color: #ffebee;
             color: #c62828;
         }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -212,9 +238,18 @@
 
             <br>
 
-            <a href="https://buy.stripe.com/dRmeVc3Ik1Kw1GU8Oo2kw00" target="_blank" class="btn btn-primary" style="display:inline-block;text-decoration:none;text-align:center;">Add Payment Method</a>
+            <a href="https://buy.stripe.com/dRmeVc3Ik1Kw1GU8Oo2kw00" class="btn btn-primary" style="display:inline-block;text-decoration:none;text-align:center;">Add Payment Method</a>
             <a href="dashboard.html" class="btn" style="background:#666;color:white;text-decoration:none;padding:12px 24px;border-radius:5px;margin-left:10px;">Back to Calendar</a>
             <p style="margin-top:10px;font-size:14px;color:#666;">Click to open Stripe secure checkout</p>
+        </div>
+    </div>
+
+    <!-- Payment Status Modal -->
+    <div class="modal" id="paymentModal">
+        <div class="modal-content" style="text-align:center;">
+            <h3 id="paymentModalTitle" style="margin-bottom:20px;"></h3>
+            <p id="paymentModalMessage" style="margin-bottom:20px;font-size:16px;"></p>
+            <a href="dashboard.html" class="btn btn-primary" style="text-decoration:none;">Go to Calendar</a>
         </div>
     </div>
 
@@ -243,7 +278,6 @@
         async function verifyStripeSession(sessionId) {
             const message = document.getElementById('paymentMessage');
             message.textContent = 'Verifying payment...';
-            message.className = 'message';
 
             try {
                 const response = await fetch('/api/stripe/verify-session', {
@@ -265,15 +299,21 @@
                         })
                     });
 
-                    message.textContent = 'Payment successful! Payment method saved.';
-                    message.className = 'message success';
+                    document.getElementById('paymentModalTitle').textContent = 'Payment Method Confirmed!';
+                    document.getElementById('paymentModalTitle').style.color = '#2e7d32';
+                    document.getElementById('paymentModalMessage').textContent = 'Your payment method has been saved successfully.';
+                    document.getElementById('paymentModal').classList.add('active');
                 } else {
-                    message.textContent = data.error || 'Payment verification failed';
-                    message.className = 'message error';
+                    document.getElementById('paymentModalTitle').textContent = 'Payment Failed';
+                    document.getElementById('paymentModalTitle').style.color = '#c62828';
+                    document.getElementById('paymentModalMessage').textContent = data.error || 'Payment could not be verified. Please try again.';
+                    document.getElementById('paymentModal').classList.add('active');
                 }
             } catch (err) {
-                message.textContent = 'Error verifying payment';
-                message.className = 'message error';
+                document.getElementById('paymentModalTitle').textContent = 'Error';
+                document.getElementById('paymentModalTitle').style.color = '#c62828';
+                document.getElementById('paymentModalMessage').textContent = 'Error verifying payment. Please try again.';
+                document.getElementById('paymentModal').classList.add('active');
             }
 
             checkPaymentStatus();
