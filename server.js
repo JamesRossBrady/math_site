@@ -147,7 +147,7 @@ app.get('/api/sessions', async (req, res) => {
     }
 });
 
-// Book a session (immediate booking - student paid upfront)
+// Book a session (student uses their available session)
 app.post('/api/sessions/book', async (req, res) => {
     try {
         const { slot_date, slot_hour, subject, textbook, chapter, struggling, userId } = req.body;
@@ -156,7 +156,7 @@ app.post('/api/sessions/book', async (req, res) => {
         const parsedHour = parseInt(slot_hour);
         const parsedUserId = parseInt(userId);
 
-        // Check user has credits
+        // Check user has at least 1 available session
         const userResult = await pool.query(
             'SELECT free_sessions FROM users WHERE id = $1',
             [parsedUserId]
@@ -168,14 +168,7 @@ app.post('/api/sessions/book', async (req, res) => {
 
         const user = userResult.rows[0];
 
-        // Count user's active sessions
-        const sessionCount = await pool.query(
-            "SELECT COUNT(*) FROM sessions WHERE student_id = $1 AND status IN ('pending', 'confirmed')",
-            [parsedUserId]
-        );
-        const activeSessions = parseInt(sessionCount.rows[0].count);
-
-        if (user.free_sessions <= activeSessions) {
+        if (user.free_sessions < 1) {
             return res.status(400).json({ error: 'No sessions left. Buy more in settings.' });
         }
 
