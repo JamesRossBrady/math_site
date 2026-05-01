@@ -295,7 +295,7 @@
             <p style="font-size:14px;margin-top:5px;">Sessions: <strong id="availableSessions" style="font-size:20px;color:#4CAF50;">0</strong></p>
         </div>
         <div>
-            <a href="settings.html">Account Settings</a>
+            <a href="payment.html">Account Settings</a>
             <a href="#" class="logout" onclick="logout()">Log Out</a>
         </div>
     </div>
@@ -629,7 +629,7 @@
                 // If they have at least 1 session, they can book
                 if (data.free_sessions < 1) {
                     alert('No sessions left. Buy more sessions in settings.');
-                    window.location.href = 'settings.html';
+                    window.location.href = 'payment.html';
                     return;
                 }
 
