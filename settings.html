@@ -20,7 +20,6 @@
         .info-value { color: #333; font-weight: bold; }
         .form-group { margin-bottom: 20px; }
         .form-group label { display: block; margin-bottom: 8px; color: #333; font-weight: bold; }
-        .form-group input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px; }
         #card-element { padding: 12px; border: 1px solid #ddd; border-radius: 5px; background: white; }
         .btn { padding: 12px 24px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
         .btn-primary { background-color: #4CAF50; color: white; }
@@ -56,10 +55,6 @@
                 <span class="info-label">Email</span>
                 <span class="info-value" id="email"></span>
             </div>
-            <div class="info-row">
-                <span class="info-label">Joined</span>
-                <span class="info-value" id="createdAt"></span>
-            </div>
         </div>
 
         <div class="section">
@@ -86,7 +81,7 @@
                 <div id="card-element"></div>
             </div>
 
-            <button class="btn btn-primary" id="saveCardBtn" onclick="savePaymentMethod()">Save Card</button>
+            <button class="btn btn-primary" id="saveCardBtn">Save Card</button>
             <a href="dashboard.html" class="btn" style="background:#666;color:white;text-decoration:none;padding:12px 24px;border-radius:5px;margin-left:10px;">Back to Calendar</a>
             <p style="margin-top:10px;font-size:14px;color:#666;">No charge will be made until you confirm a session.</p>
         </div>
@@ -101,28 +96,25 @@
         document.getElementById('username').textContent = user.username;
         document.getElementById('email').textContent = user.email;
 
-        // Check initial payment status
-        checkPaymentStatus();
+        let stripe, cardElement;
 
-        // Initialize Stripe - keep reference globally
-        let stripe, card;
-        if (typeof Stripe === 'undefined') {
-            document.getElementById('paymentMessage').textContent = 'Stripe failed to load.';
-            document.getElementById('paymentMessage').className = 'message error';
-        } else {
+        // Initialize Stripe
+        if (typeof Stripe !== 'undefined') {
             stripe = Stripe('pk_live_51TQsYgAoZCeoX20P4eL4bGqN7XTGysrbE6ne9jjnZqEXp2So9exxgVB2Z3vQ06CHRVE6NYRxMF2kiUrHa72eNLfz00uiv3rONw');
             const elements = stripe.elements();
-            card = elements.create('card', { style: { base: { fontSize: '16px' } } });
-            setTimeout(() => card.mount('#card-element'), 100);
+            cardElement = elements.create('card', { style: { base: { fontSize: '16px' } } });
+            setTimeout(() => cardElement.mount('#card-element'), 100);
         }
 
-        async function savePaymentMethod() {
+        checkPaymentStatus();
+
+        document.getElementById('saveCardBtn').addEventListener('click', async () => {
             const btn = document.getElementById('saveCardBtn');
             const message = document.getElementById('paymentMessage');
             btn.disabled = true;
             btn.textContent = 'Saving...';
 
-            if (!stripe || !card) {
+            if (!stripe || !cardElement) {
                 message.textContent = 'Stripe not loaded. Refresh and try again.';
                 message.className = 'message error';
                 btn.disabled = false;
@@ -131,10 +123,21 @@
             }
 
             try {
-                const { paymentMethod, error } = await stripe.createPaymentMethod({
-                    type: 'card',
-                    card: card,
-                    billing_details: { email: user.email }
+                // Get SetupIntent client secret from server
+                const setupRes = await fetch('/api/stripe/create-setup', { method: 'POST' });
+                const { clientSecret, error: setupError } = await setupRes.json();
+
+                if (setupError) {
+                    message.textContent = setupError;
+                    message.className = 'message error';
+                    btn.disabled = false;
+                    btn.textContent = 'Save Card';
+                    return;
+                }
+
+                // Confirm card setup (no charge!)
+                const { setupIntent, error } = await stripe.confirmCardSetup(clientSecret, {
+                    payment_method: { card: cardElement }
                 });
 
                 if (error) {
@@ -145,18 +148,19 @@
                     return;
                 }
 
-                const response = await fetch('/api/user/payment-method', {
+                // Save payment method to user
+                const saveRes = await fetch('/api/user/payment-method', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: user.id, paymentMethodId: paymentMethod.id })
+                    body: JSON.stringify({ userId: user.id, paymentMethodId: setupIntent.payment_method })
                 });
 
-                if (response.ok) {
-                    message.textContent = 'Payment method saved! No charge will be made until session is confirmed.';
+                if (saveRes.ok) {
+                    message.textContent = 'Payment method saved! No charge will be made until you confirm a session.';
                     message.className = 'message success';
                     checkPaymentStatus();
                 } else {
-                    const data = await response.json();
+                    const data = await saveRes.json();
                     message.textContent = data.error || 'Failed to save';
                     message.className = 'message error';
                 }
@@ -167,7 +171,7 @@
 
             btn.disabled = false;
             btn.textContent = 'Save Card';
-        }
+        });
 
         async function checkPaymentStatus() {
             try {

@@ -542,6 +542,24 @@ app.post('/api/stripe/verify-session', async (req, res) => {
     }
 });
 
+// Create a SetupIntent (saves card without charging)
+app.post('/api/stripe/create-setup', async (req, res) => {
+    try {
+        if (!stripe) {
+            return res.status(500).json({ error: 'Stripe not configured' });
+        }
+
+        const setupIntent = await stripe.setupIntents.create({
+            usage: 'off_session',
+        });
+
+        res.json({ clientSecret: setupIntent.client_secret });
+    } catch (err) {
+        console.error('Create setup error:', err);
+        res.status(500).json({ error: 'Failed to create setup' });
+    }
+});
+
 // Tutor login API
 app.post('/api/tutor/login', (req, res) => {
     const { password } = req.body;
