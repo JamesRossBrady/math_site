@@ -626,17 +626,8 @@
                 const response = await fetch('/api/user/' + user.id);
                 const data = await response.json();
 
-                // Count active sessions by this user
-                const sessionsResponse = await fetch('/api/sessions?start_date=2026-01-01&end_date=2026-12-31');
-                const allSessions = await sessionsResponse.json();
-
-                const userSessions = allSessions.filter(s => s.student_id == user.id && (s.status === 'pending' || s.status === 'confirmed'));
-                const activeSessions = userSessions.length;
-
-                // Just check if they have credits
-                const hasCredits = data.free_sessions > activeSessions;
-
-                if (!hasCredits) {
+                // If they have at least 1 session, they can book
+                if (data.free_sessions < 1) {
                     alert('No sessions left. Buy more sessions in settings.');
                     window.location.href = 'settings.html';
                     return;
