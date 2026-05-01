@@ -137,11 +137,9 @@
                         autoGainControl: true
                     }
                 });
-                return true;
             } catch (err) {
-                console.error('Mic error:', err);
-                setAudioStatus('Mic access denied', 'error');
-                return false;
+                console.warn('Mic not available:', err);
+                audioStream = null;
             }
         }
 
@@ -153,9 +151,9 @@
             });
 
             peer.on('call', (call) => {
-                call.answer(audioStream);
+                call.answer(audioStream);  // audioStream may be null if no mic
                 currentCall = call;
-                setAudioStatus('Student connected!');
+                setAudioStatus(audioStream ? 'Student connected!' : 'Student connected (no mic)');
 
                 call.on('stream', (remoteStream) => {
                     playAudio(remoteStream);
@@ -187,7 +185,7 @@
             peer = new Peer();
 
             peer.on('open', () => {
-                setAudioStatus('Calling tutor...');
+                setAudioStatus(audioStream ? 'Calling tutor...' : 'Connecting (no mic)...');
                 attemptCall();
             });
 
@@ -215,7 +213,7 @@
 
             call.on('stream', (remoteStream) => {
                 playAudio(remoteStream);
-                setAudioStatus('Connected', 'connected');
+                setAudioStatus(audioStream ? 'Connected' : 'Connected (no mic, listen only)', 'connected');
                 studentRetries = 0;
             });
 
@@ -242,6 +240,7 @@
         }
 
         function playAudio(stream) {
+            if (!stream) return;
             let audio = document.getElementById('remoteAudio');
             if (!audio) {
                 audio = document.createElement('audio');
@@ -265,8 +264,7 @@
 
         // Initialize audio on load with a delay to let old peer disconnect
         (async function() {
-            const ok = await initAudio();
-            if (!ok) return;
+            await initAudio();
 
             // Small delay to let previous peer (from video.html) fully disconnect
             await new Promise(r => setTimeout(r, 500));

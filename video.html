@@ -113,8 +113,8 @@
                     }
                 });
             } catch (err) {
-                console.error('Mic error:', err);
-                statusEl.textContent = 'Could not access microphone. Check permissions.';
+                console.warn('Mic not available:', err);
+                audioStream = null;
             }
         }
 
@@ -183,6 +183,7 @@
         let audioInitialized = false;
 
         function playAudio(stream) {
+            if (!stream) return;
             let audio = document.getElementById('remoteAudio');
             if (!audio) {
                 audio = document.createElement('audio');
