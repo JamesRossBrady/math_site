@@ -682,8 +682,11 @@
                 });
 
                 if (response.ok) {
+                    const hour = parseInt(selectedHour);
+                    const displayHour = hour > 12 ? hour - 12 : hour;
+                    const ampm = hour >= 12 ? 'PM' : 'AM';
                     closeModal();
-                    alert('Your session for ' + selectedHour + ':00 on ' + selectedDate + ' has been confirmed!');
+                    alert('Your session for ' + displayHour + ':00 ' + ampm + ' on ' + selectedDate + ' has been confirmed!');
                 } else {
                     const data = await response.json();
                     alert(data.error || 'Failed to book session');
