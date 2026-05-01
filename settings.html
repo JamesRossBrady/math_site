@@ -57,8 +57,9 @@
         <div class="section">
             <h2>Get Sessions</h2>
             <div id="paymentMessage"></div>
-            <a href="https://buy.stripe.com/dRmeVc3Ik1Kw1GU8Oo2kw00" class="btn btn-primary">Buy Sessions ($25 each)</a>
-            <p style="margin-top:10px;font-size:14px;color:#666;">Click to buy sessions. You'll have immediate access to book.</p>
+            <a href="https://buy.stripe.com/dRmeVc3Ik1Kw1GU8Oo2kw00" class="btn btn-primary" style="display:inline-block;text-decoration:none;text-align:center;">Buy Sessions ($25)</a>
+            <a href="dashboard.html" class="btn" style="background:#666;color:white;text-decoration:none;padding:12px 24px;border-radius:5px;margin-left:10px;">Back to Calendar</a>
+            <p style="margin-top:10px;font-size:14px;color:#666;">Click to pay. After payment, you'll be redirected back here.</p>
         </div>
     </div>
 
@@ -71,53 +72,18 @@
         document.getElementById('username').textContent = user.username;
         document.getElementById('email').textContent = user.email;
 
-        // Check for Stripe redirect
+        // Check for Stripe redirect (they paid and returned)
         const urlParams = new URLSearchParams(window.location.search);
         const sessionId = urlParams.get('session_id');
 
         if (sessionId) {
-            verifyPayment(sessionId);
+            const message = document.getElementById('paymentMessage');
+            message.textContent = 'Payment received! Your session is now active. Go to calendar to book your slot.';
+            message.className = 'message success';
             window.history.replaceState({}, document.title, window.location.pathname);
         }
 
         checkCredits();
-
-        async function verifyPayment(sessionId) {
-            const message = document.getElementById('paymentMessage');
-            message.textContent = 'Verifying payment...';
-
-            try {
-                const response = await fetch('/api/stripe/verify-session', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sessionId })
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.paymentMethodId) {
-                    // Add a paid session to their account
-                    await fetch('/api/user/free-sessions', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ userId: user.id, amount: 1 })
-                    });
-
-                    message.textContent = 'Payment successful! You now have 1 session to book.';
-                    message.className = 'message success';
-                } else {
-                    message.textContent = 'Payment verification failed';
-                    message.className = 'message error';
-                }
-            } catch (err) {
-                message.textContent = 'Error verifying payment';
-                message.className = 'message error';
-            }
-
-            checkCredits();
-        }
-
-        async function checkCredits() {
             try {
                 const response = await fetch('/api/user/' + user.id);
                 const data = await response.json();
